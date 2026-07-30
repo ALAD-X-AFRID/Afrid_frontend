@@ -41,6 +41,13 @@ export default function BankingSimPage() {
 
   const telemetry = useBankingTelemetry(sessionId, user?.uid, user?.email || "", user?.displayName || "", user?.displayName || "");
 
+  useEffect(() => {
+    if (sessionId) {
+      telemetry.startSimulation();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [sessionId]);
+
   const flashNotice = useCallback((msg: string) => {
     setFlash({ msg, visible: true });
     setTimeout(() => setFlash({ msg: "", visible: false }), 1800);
@@ -214,10 +221,30 @@ export default function BankingSimPage() {
     { label: "Device model", value: telemetry.stats.deviceModel },
     { label: "OS version", value: telemetry.stats.osVersion },
     { label: "Network type", value: telemetry.stats.networkType },
+    { label: "Avg touch hold", value: telemetry.stats.averageTouchHold ? `${Math.round(telemetry.stats.averageTouchHold)} ms` : "0 ms" },
+    { label: "Touch hold var", value: telemetry.stats.touchHoldVariance ? telemetry.stats.touchHoldVariance.toFixed(1) : 0 },
+    { label: "Touch precision", value: telemetry.stats.averageTouchPrecision ? `${telemetry.stats.averageTouchPrecision.toFixed(1)} px` : "0 px" },
+    { label: "Field dwell", value: telemetry.stats.averageFieldDwell ? `${Math.round(telemetry.stats.averageFieldDwell)} ms` : "0 ms" },
+    { label: "Field revisits", value: telemetry.stats.totalFieldRevisits || 0 },
+    { label: "Password unmask", value: telemetry.stats.passwordUnmaskCount || 0 },
+    { label: "Backspace bursts", value: telemetry.stats.backspaceBursts || 0 },
+    { label: "Digraph pairs", value: telemetry.stats.digraphCount || 0 },
   ];
 
   const handlePointerDown = useCallback((e: React.PointerEvent) => {
-    telemetry.recordPointerDown();
+    const target = e.target as HTMLElement;
+    let precision = 0;
+    if (target) {
+      const rect = target.getBoundingClientRect();
+      if (rect.width > 0 && rect.height > 0) {
+        const centerX = rect.left + rect.width / 2;
+        const centerY = rect.top + rect.height / 2;
+        precision = Math.sqrt(
+          Math.pow(e.clientX - centerX, 2) + Math.pow(e.clientY - centerY, 2)
+        );
+      }
+    }
+    telemetry.recordPointerDown(precision);
     if (e.pointerType === "touch") return;
     const pressure = (e.nativeEvent as PointerEvent).pressure;
     if (pressure && pressure > 0) {
@@ -225,6 +252,10 @@ export default function BankingSimPage() {
     } else {
       telemetry.trackButtonPressure(0.5);
     }
+  }, [telemetry]);
+
+  const handlePointerUp = useCallback(() => {
+    telemetry.recordPointerUp();
   }, [telemetry]);
 
   const handleTouchStart = useCallback((e: React.TouchEvent) => {
@@ -272,7 +303,7 @@ export default function BankingSimPage() {
   };
 
   return (
-    <section className="min-h-screen px-6 pb-24 pt-32" onPointerDown={handlePointerDown} onTouchStart={handleTouchStart}>
+    <section className="min-h-screen px-6 pb-24 pt-32" onPointerDown={handlePointerDown} onPointerUp={handlePointerUp} onTouchStart={handleTouchStart}>
       <div className="mx-auto max-w-[960px] rounded-[32px] border border-white/[0.08] bg-white/[0.02] p-8 shadow-2xl backdrop-blur-sm max-md:p-5">
         {/* Header */}
         <header className="mb-8 flex flex-col justify-between gap-4 md:flex-row md:items-start">
@@ -369,10 +400,13 @@ export default function BankingSimPage() {
                   onChange={(e) => {
                     setLoginForm((f) => ({ ...f, username: e.target.value }));
                     handleFieldChange("login-username", e);
+                    telemetry.trackInputChange("login-username", e);
                   }}
                   onKeyDown={(e) => handleFieldKeyDown("login-username", e)}
                   onKeyUp={(e) => handleFieldKeyUp("login-username", e)}
-                  className="mt-2 w-full rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-sm text-white outline-none transition-colors focus:border-[rgba(57, 224, 255,0.4)]"
+                  onFocus={() => telemetry.recordFieldFocus("login-username")}
+                  onBlur={() => telemetry.recordFieldBlur("login-username")}
+                  className="mt-2 w-full rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-sm text-white outline-none transition-colors focus:border-[rgba(57,224,255,0.4)]"
                 />
               </label>
               <label className="text-sm text-muted">
@@ -387,14 +421,17 @@ export default function BankingSimPage() {
                     onChange={(e) => {
                       setLoginForm((f) => ({ ...f, password: e.target.value }));
                       handleFieldChange("login-password", e);
+                      telemetry.trackInputChange("login-password", e);
                     }}
                     onKeyDown={(e) => handleFieldKeyDown("login-password", e)}
                     onKeyUp={(e) => handleFieldKeyUp("login-password", e)}
-                    className="w-full rounded-xl border border-white/10 bg-white/5 px-4 py-3 pr-10 text-sm text-white outline-none transition-colors focus:border-[rgba(57, 224, 255,0.4)]"
+                    onFocus={() => telemetry.recordFieldFocus("login-password")}
+                    onBlur={() => telemetry.recordFieldBlur("login-password")}
+                    className="w-full rounded-xl border border-white/10 bg-white/5 px-4 py-3 pr-10 text-sm text-white outline-none transition-colors focus:border-[rgba(57,224,255,0.4)]"
                   />
                   <button
                     type="button"
-                    onClick={() => setShowPassword((v) => !v)}
+                    onClick={() => { setShowPassword((v) => !v); telemetry.recordPasswordUnmask(); }}
                     className="absolute right-3 top-1/2 -translate-y-1/2 text-muted"
                     aria-label="Toggle password visibility"
                   >
@@ -442,6 +479,8 @@ export default function BankingSimPage() {
                   }}
                   onKeyDown={(e) => handleFieldKeyDown("recipient-name", e)}
                   onKeyUp={(e) => handleFieldKeyUp("recipient-name", e)}
+                  onFocus={() => telemetry.recordFieldFocus("recipient-name")}
+                  onBlur={() => telemetry.recordFieldBlur("recipient-name")}
                   placeholder="Amina Mensah"
                   className="mt-2 w-full rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-sm text-white outline-none focus:border-[rgba(57, 224, 255,0.4)]"
                 />
@@ -458,6 +497,8 @@ export default function BankingSimPage() {
                   }}
                   onKeyDown={(e) => handleFieldKeyDown("recipient-account", e)}
                   onKeyUp={(e) => handleFieldKeyUp("recipient-account", e)}
+                  onFocus={() => telemetry.recordFieldFocus("recipient-account")}
+                  onBlur={() => telemetry.recordFieldBlur("recipient-account")}
                   placeholder="0123456789"
                   className="mt-2 w-full rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-sm text-white outline-none focus:border-[rgba(57, 224, 255,0.4)]"
                 />
@@ -474,6 +515,8 @@ export default function BankingSimPage() {
                   }}
                   onKeyDown={(e) => handleFieldKeyDown("transfer-amount", e)}
                   onKeyUp={(e) => handleFieldKeyUp("transfer-amount", e)}
+                  onFocus={() => telemetry.recordFieldFocus("transfer-amount")}
+                  onBlur={() => telemetry.recordFieldBlur("transfer-amount")}
                   placeholder="1000"
                   className="mt-2 w-full rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-sm text-white outline-none focus:border-[rgba(57, 224, 255,0.4)]"
                 />
@@ -565,6 +608,8 @@ export default function BankingSimPage() {
                   }}
                   onKeyDown={(e) => handleFieldKeyDown("bank-search-input", e)}
                   onKeyUp={(e) => handleFieldKeyUp("bank-search-input", e)}
+                  onFocus={() => telemetry.recordFieldFocus("bank-search-input")}
+                  onBlur={() => telemetry.recordFieldBlur("bank-search-input")}
                   placeholder="Start typing to filter banks..."
                   autoComplete="off"
                   className="mt-2 w-full rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-sm text-white outline-none focus:border-[rgba(57, 224, 255,0.4)]"
@@ -709,7 +754,18 @@ export default function BankingSimPage() {
             <div className="mb-4">
               <p className="mb-3 text-xs font-semibold uppercase tracking-[0.15em] text-[#39e0ff]">Device & Environment</p>
               <div className="grid gap-3 sm:grid-cols-2 md:grid-cols-4">
-                {metricCards.slice(18).map((m) => (
+                {metricCards.slice(18, 29).map((m) => (
+                  <div key={m.label} className="rounded-2xl border border-white/[0.06] bg-white/[0.03] p-4">
+                    <span className="block text-xs text-muted">{m.label}</span>
+                    <strong className="text-lg text-white">{m.value}</strong>
+                  </div>
+                ))}
+              </div>
+            </div>
+            <div className="mb-4">
+              <p className="mb-3 text-xs font-semibold uppercase tracking-[0.15em] text-[#b27bff]">Touch Dynamics</p>
+              <div className="grid gap-3 sm:grid-cols-2 md:grid-cols-4">
+                {metricCards.slice(29).map((m) => (
                   <div key={m.label} className="rounded-2xl border border-white/[0.06] bg-white/[0.03] p-4">
                     <span className="block text-xs text-muted">{m.label}</span>
                     <strong className="text-lg text-white">{m.value}</strong>

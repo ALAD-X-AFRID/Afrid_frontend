@@ -57,6 +57,31 @@ type TelemetryStats = {
   osVersion: string;
   platform: string;
   networkType: string;
+  // Phase 1: Session lifecycle
+  sessionStartedAt: string;
+  sessionEndedAt: string;
+  sessionDurationMs: number;
+  // Phase 2: Touch hold duration
+  averageTouchHold: number;
+  touchHoldVariance: number;
+  // Phase 3: Touch precision
+  averageTouchPrecision: number;
+  touchPrecisionVariance: number;
+  // Phase 4: Field focus/blur dwell
+  averageFieldDwell: number;
+  totalFieldFocusTime: number;
+  // Phase 5: Field revisit count
+  totalFieldRevisits: number;
+  // Phase 6: Password unmask
+  passwordUnmaskCount: number;
+  // Phase 7: Backspace burst
+  backspaceBursts: number;
+  singleBackspaces: number;
+  backspaceBurstRatio: number;
+  // Phase 8: Digraph timing
+  digraphCount: number;
+  digraphTimingVariance: number;
+  digraphTimingMean: number;
 };
 
 type FieldState = {
@@ -121,6 +146,23 @@ const defaultStats: TelemetryStats = {
   osVersion: "unknown",
   platform: "web",
   networkType: "unknown",
+  sessionStartedAt: "",
+  sessionEndedAt: "",
+  sessionDurationMs: 0,
+  averageTouchHold: 0,
+  touchHoldVariance: 0,
+  averageTouchPrecision: 0,
+  touchPrecisionVariance: 0,
+  averageFieldDwell: 0,
+  totalFieldFocusTime: 0,
+  totalFieldRevisits: 0,
+  passwordUnmaskCount: 0,
+  backspaceBursts: 0,
+  singleBackspaces: 0,
+  backspaceBurstRatio: 0,
+  digraphCount: 0,
+  digraphTimingVariance: 0,
+  digraphTimingMean: 0,
 };
 
 export function useBankingTelemetry(sessionId: string, uid?: string, userEmail?: string, userName?: string, username?: string) {
@@ -145,7 +187,27 @@ export function useBankingTelemetry(sessionId: string, uid?: string, userEmail?:
     jitterSamples: 0,
   });
   const simulationEndedRef = useRef(false);
+  const simulationStartedRef = useRef(false);
   const statsRef = useRef<TelemetryStats>({ ...defaultStats });
+
+  // Phase 2: Touch hold duration refs
+  const pointerDownAtRef = useRef<number | null>(null);
+  const touchHoldDurationsRef = useRef<number[]>([]);
+  // Phase 3: Touch precision refs
+  const touchPrecisionRef = useRef<number[]>([]);
+  // Phase 4 & 5: Field focus/blur/revisit refs
+  const fieldFocusRef = useRef<Record<string, { focusAt: number | null; totalFocusMs: number; visitCount: number }>>({});
+  // Phase 6: Password unmask refs
+  const passwordUnmaskCountRef = useRef(0);
+  // Phase 7: Backspace burst refs
+  const backspaceTimestampsRef = useRef<number[]>([]);
+  const backspaceBurstsRef = useRef(0);
+  const singleBackspacesRef = useRef(0);
+  // Phase 8: Digraph timing refs
+  const digraphTimingsRef = useRef<Record<string, number[]>>({});
+  // Sensor subscription refs (for endSimulation cleanup)
+  const accelSubRef = useRef<{ unsubscribe: () => void } | null>(null);
+  const orientSubRef = useRef<{ unsubscribe: () => void } | null>(null);
 
   const [stats, setStats] = useState<TelemetryStats>({ ...defaultStats });
   const [eventCount, setEventCount] = useState(0);
@@ -239,6 +301,62 @@ export function useBankingTelemetry(sessionId: string, uid?: string, userEmail?:
           buttonPressuresRef.current.length
         : 0;
 
+    // Phase 2: Touch hold duration
+    const holdDurations = touchHoldDurationsRef.current;
+    const averageTouchHold = holdDurations.length
+      ? holdDurations.reduce((a, b) => a + b, 0) / holdDurations.length
+      : 0;
+    const touchHoldVariance = holdDurations.length > 1
+      ? holdDurations.reduce((a, b) => a + Math.pow(b - averageTouchHold, 2), 0) / holdDurations.length
+      : 0;
+
+    // Phase 3: Touch precision
+    const precisionValues = touchPrecisionRef.current;
+    const averageTouchPrecision = precisionValues.length
+      ? precisionValues.reduce((a, b) => a + b, 0) / precisionValues.length
+      : 0;
+    const touchPrecisionVariance = precisionValues.length > 1
+      ? precisionValues.reduce((a, b) => a + Math.pow(b - averageTouchPrecision, 2), 0) / precisionValues.length
+      : 0;
+
+    // Phase 4 & 5: Field focus dwell + revisits
+    const fieldFocusEntries = Object.values(fieldFocusRef.current);
+    const totalFieldFocusTime = fieldFocusEntries.reduce((sum, f) => sum + f.totalFocusMs, 0);
+    const averageFieldDwell = fieldFocusEntries.length
+      ? totalFieldFocusTime / fieldFocusEntries.length
+      : 0;
+    const totalFieldRevisits = fieldFocusEntries.reduce(
+      (sum, f) => sum + Math.max(0, f.visitCount - 1), 0
+    );
+
+    // Phase 6: Password unmask
+    const passwordUnmaskCount = passwordUnmaskCountRef.current;
+
+    // Phase 7: Backspace burst
+    const backspaceBursts = backspaceBurstsRef.current;
+    const singleBackspaces = singleBackspacesRef.current;
+    const backspaceBurstRatio = (backspaceBursts + singleBackspaces) > 0
+      ? backspaceBursts / (backspaceBursts + singleBackspaces)
+      : 0;
+
+    // Phase 8: Digraph timing
+    const digraphEntries = Object.values(digraphTimingsRef.current);
+    const digraphCount = digraphEntries.length;
+    const digraphPairMeans = digraphEntries.map((arr) =>
+      arr.length > 0 ? arr.reduce((a, b) => a + b, 0) / arr.length : 0
+    );
+    const digraphTimingMean = digraphPairMeans.length
+      ? digraphPairMeans.reduce((a, b) => a + b, 0) / digraphPairMeans.length
+      : 0;
+    const digraphPairVariances = digraphEntries.map((arr) => {
+      if (arr.length < 2) return 0;
+      const mean = arr.reduce((a, b) => a + b, 0) / arr.length;
+      return arr.reduce((a, b) => a + Math.pow(b - mean, 2), 0) / arr.length;
+    });
+    const digraphTimingVariance = digraphPairVariances.length
+      ? digraphPairVariances.reduce((a, b) => a + b, 0) / digraphPairVariances.length
+      : 0;
+
     const newStats: TelemetryStats = {
       ...statsRef.current,
       totalKeystrokes,
@@ -252,6 +370,20 @@ export function useBankingTelemetry(sessionId: string, uid?: string, userEmail?:
       neuromuscularEntropy,
       distributionJitter,
       averageButtonPressure,
+      averageTouchHold,
+      touchHoldVariance,
+      averageTouchPrecision,
+      touchPrecisionVariance,
+      averageFieldDwell,
+      totalFieldFocusTime,
+      totalFieldRevisits,
+      passwordUnmaskCount,
+      backspaceBursts,
+      singleBackspaces,
+      backspaceBurstRatio,
+      digraphCount,
+      digraphTimingVariance,
+      digraphTimingMean,
     };
 
     statsRef.current = newStats;
@@ -300,6 +432,34 @@ export function useBankingTelemetry(sessionId: string, uid?: string, userEmail?:
       });
 
       statsRef.current.totalKeystrokes += 1;
+
+      // Phase 7: Backspace burst detection
+      if (event.key === "Backspace") {
+        const bsNow = performance.now();
+        backspaceTimestampsRef.current.push(bsNow);
+        const ts = backspaceTimestampsRef.current;
+        if (ts.length >= 3) {
+          const last3 = ts.slice(-3);
+          if (last3[2] - last3[0] <= 500) {
+            backspaceBurstsRef.current += 1;
+            backspaceTimestampsRef.current = ts.slice(0, -3);
+          } else {
+            singleBackspacesRef.current += 1;
+            backspaceTimestampsRef.current = ts.slice(-1);
+          }
+        }
+      }
+
+      // Phase 8: Digraph timing
+      if (flight !== null && state.keystrokes.length >= 2) {
+        const prevKey = state.keystrokes[state.keystrokes.length - 2].key;
+        const digraphKey = `${prevKey}>${event.key}`;
+        if (!digraphTimingsRef.current[digraphKey]) {
+          digraphTimingsRef.current[digraphKey] = [];
+        }
+        digraphTimingsRef.current[digraphKey].push(flight);
+      }
+
       pushTelemetry("keystroke", {
         field: fieldName,
         key: event.key,
@@ -654,12 +814,60 @@ export function useBankingTelemetry(sessionId: string, uid?: string, userEmail?:
     [pushTelemetry, persistTelemetry, refreshTelemetryDisplay]
   );
 
-  const recordPointerDown = useCallback(() => {
+  const recordPointerDown = useCallback((precision?: number) => {
     if (simulationEndedRef.current) return;
-    sensorStateRef.current.lastTapTime = performance.now();
+    const now = performance.now();
+    sensorStateRef.current.lastTapTime = now;
     sensorStateRef.current.tapAlreadyCorrelated = false;
     statsRef.current.totalTaps = (statsRef.current.totalTaps || 0) + 1;
+    pointerDownAtRef.current = now;
+    // Phase 3: Touch precision
+    if (precision !== undefined && precision >= 0) {
+      touchPrecisionRef.current.push(precision);
+    }
   }, []);
+
+  // Phase 2: Touch hold duration
+  const recordPointerUp = useCallback(() => {
+    if (simulationEndedRef.current) return;
+    if (pointerDownAtRef.current !== null) {
+      const holdDuration = performance.now() - pointerDownAtRef.current;
+      touchHoldDurationsRef.current.push(holdDuration);
+      pointerDownAtRef.current = null;
+      refreshTelemetryDisplay();
+    }
+  }, [refreshTelemetryDisplay]);
+
+  // Phase 4 & 5: Field focus/blur dwell + revisits
+  const recordFieldFocus = useCallback((fieldName: string) => {
+    if (simulationEndedRef.current) return;
+    if (!fieldFocusRef.current[fieldName]) {
+      fieldFocusRef.current[fieldName] = { focusAt: null, totalFocusMs: 0, visitCount: 0 };
+    }
+    fieldFocusRef.current[fieldName].focusAt = performance.now();
+    fieldFocusRef.current[fieldName].visitCount += 1;
+  }, []);
+
+  const recordFieldBlur = useCallback((fieldName: string) => {
+    if (simulationEndedRef.current) return;
+    const f = fieldFocusRef.current[fieldName];
+    if (f && f.focusAt !== null) {
+      f.totalFocusMs += performance.now() - f.focusAt;
+      f.focusAt = null;
+      refreshTelemetryDisplay();
+    }
+  }, [refreshTelemetryDisplay]);
+
+  // Phase 6: Password unmask
+  const recordPasswordUnmask = useCallback(() => {
+    if (simulationEndedRef.current) return;
+    passwordUnmaskCountRef.current += 1;
+    pushTelemetry("password_unmask", {
+      time: new Date().toISOString(),
+    });
+    persistTelemetry();
+    refreshTelemetryDisplay();
+  }, [pushTelemetry, persistTelemetry, refreshTelemetryDisplay]);
 
   const recordMultiTouch = useCallback(() => {
     if (simulationEndedRef.current) return;
@@ -673,10 +881,39 @@ export function useBankingTelemetry(sessionId: string, uid?: string, userEmail?:
     refreshTelemetryDisplay();
   }, [refreshTelemetryDisplay]);
 
+  // Phase 1: Start simulation
+  const startSimulation = useCallback(() => {
+    if (simulationStartedRef.current || simulationEndedRef.current) return;
+    simulationStartedRef.current = true;
+    const now = new Date().toISOString();
+    statsRef.current.sessionStartedAt = now;
+    pushTelemetry("session_start", { startedAt: now });
+  }, [pushTelemetry]);
+
   // End simulation
   const endSimulation = useCallback(() => {
+    if (simulationEndedRef.current) return;
     simulationEndedRef.current = true;
-  }, []);
+    const now = new Date().toISOString();
+    statsRef.current.sessionEndedAt = now;
+    const startMs = statsRef.current.sessionStartedAt
+      ? new Date(statsRef.current.sessionStartedAt).getTime()
+      : 0;
+    statsRef.current.sessionDurationMs = startMs
+      ? Date.now() - startMs
+      : 0;
+    // Unsubscribe sensor listeners
+    accelSubRef.current?.unsubscribe();
+    orientSubRef.current?.unsubscribe();
+    accelSubRef.current = null;
+    orientSubRef.current = null;
+    // Final metrics computation
+    computeMetrics();
+    pushTelemetry("session_end", {
+      endedAt: now,
+      durationMs: statsRef.current.sessionDurationMs,
+    });
+  }, [computeMetrics, pushTelemetry]);
 
   // Build export row
   const buildExportRow = useCallback((): (string | number)[] => {
@@ -742,6 +979,23 @@ export function useBankingTelemetry(sessionId: string, uid?: string, userEmail?:
       s.osVersion,
       s.platform,
       s.networkType,
+      s.sessionStartedAt || "",
+      s.sessionEndedAt || "",
+      s.sessionDurationMs || 0,
+      Number((s.averageTouchHold || 0).toFixed(2)),
+      Number((s.touchHoldVariance || 0).toFixed(2)),
+      Number((s.averageTouchPrecision || 0).toFixed(2)),
+      Number((s.touchPrecisionVariance || 0).toFixed(2)),
+      Number((s.averageFieldDwell || 0).toFixed(2)),
+      Number((s.totalFieldFocusTime || 0).toFixed(2)),
+      s.totalFieldRevisits || 0,
+      s.passwordUnmaskCount || 0,
+      s.backspaceBursts || 0,
+      s.singleBackspaces || 0,
+      Number((s.backspaceBurstRatio || 0).toFixed(4)),
+      s.digraphCount || 0,
+      Number((s.digraphTimingVariance || 0).toFixed(4)),
+      Number((s.digraphTimingMean || 0).toFixed(2)),
       1, // is_human
     ];
   }, [sessionId, computeMetrics]);
@@ -857,12 +1111,9 @@ export function useBankingTelemetry(sessionId: string, uid?: string, userEmail?:
     window.addEventListener("blur", handleBlur);
     window.addEventListener("focus", handleFocus);
 
-    let accelSub: { unsubscribe: () => void } | null = null;
-    let orientSub: { unsubscribe: () => void } | null = null;
-
     if (!document.hidden && document.visibilityState === "visible") {
-      subscribeAcceleration((d) => recordMotion(d.x, d.y, d.z, d.interval)).then((sub) => { accelSub = sub; });
-      subscribeOrientation((d) => recordOrientation(d.alpha, d.beta, d.gamma)).then((sub) => { orientSub = sub; });
+      subscribeAcceleration((d) => recordMotion(d.x, d.y, d.z, d.interval)).then((sub) => { accelSubRef.current = sub; });
+      subscribeOrientation((d) => recordOrientation(d.alpha, d.beta, d.gamma)).then((sub) => { orientSubRef.current = sub; });
     }
 
     // Touch tracking
@@ -884,8 +1135,10 @@ export function useBankingTelemetry(sessionId: string, uid?: string, userEmail?:
       document.removeEventListener("visibilitychange", handleVisibility);
       window.removeEventListener("blur", handleBlur);
       window.removeEventListener("focus", handleFocus);
-      accelSub?.unsubscribe();
-      orientSub?.unsubscribe();
+      accelSubRef.current?.unsubscribe();
+      orientSubRef.current?.unsubscribe();
+      accelSubRef.current = null;
+      orientSubRef.current = null;
       document.removeEventListener("touchstart", handleTouchStart);
       document.removeEventListener("touchcancel", handleTouchCancel);
     };
@@ -921,8 +1174,13 @@ export function useBankingTelemetry(sessionId: string, uid?: string, userEmail?:
     recordBankSearch,
     recordBankConfirmed,
     recordPointerDown,
+    recordPointerUp,
+    recordFieldFocus,
+    recordFieldBlur,
+    recordPasswordUnmask,
     recordMultiTouch,
     recordTouchDeformation,
+    startSimulation,
     endSimulation,
     buildExportRow,
     sendToFirestore,
