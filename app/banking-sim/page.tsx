@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import { motion } from "framer-motion";
-import { Eye, EyeOff, RefreshCw, Download, CheckCircle, Loader2 } from "lucide-react";
+import { Eye, EyeOff, RefreshCw, Download, CheckCircle, Loader2, ChevronDown } from "lucide-react";
 import { useBankingTelemetry } from "@/hooks/use-banking-telemetry";
 import { useMetadata } from "@/context/metadata-context";
 import { NIGERIAN_BANKS } from "@/lib/banking-constants";
@@ -33,6 +33,18 @@ export default function BankingSimPage() {
   const [submitResult, setSubmitResult] = useState<"none" | "success" | "error">("none");
   const [completedSteps, setCompletedSteps] = useState<Record<string, boolean>>({});
   const [, setSwipeProgress] = useState(0);
+  const [openGroups, setOpenGroups] = useState<Record<string, boolean>>({
+    metadata: true,
+    typing: true,
+    touch: true,
+    device: true,
+    touchDynamics: true,
+    session: true,
+  });
+
+  const toggleGroup = (key: string) => {
+    setOpenGroups((s) => ({ ...s, [key]: !s[key] }));
+  };
 
   useEffect(() => {
     const id = "BANKSIM-" + Date.now();
@@ -69,6 +81,9 @@ export default function BankingSimPage() {
   const advance = (targetStep?: number) => {
     const next = targetStep ?? Math.min(4, step + 1);
     setStep(next);
+    if (next === 4) {
+      telemetry.endSimulation();
+    }
   };
 
   // Step 1: Login
@@ -190,45 +205,104 @@ export default function BankingSimPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [sessionId, user?.uid]);
 
-  const metricCards = [
-    { label: "Typing actions", value: telemetry.stats.totalKeystrokes },
-    { label: "Text fixes", value: telemetry.stats.totalCorrections },
-    { label: "Login attempts", value: telemetry.stats.totalLoginAttempts },
-    { label: "Login problems", value: telemetry.stats.totalLoginErrors },
-    { label: "Form reviews", value: telemetry.stats.totalReviewChecks },
-    { label: "Transfers done", value: telemetry.stats.totalTransfers },
-    { label: "Swipe incomplete", value: telemetry.stats.incompleteSwipes },
-    { label: "Swipe completes", value: telemetry.stats.completedSwipes },
-    { label: "Screen jumps", value: telemetry.stats.totalNavTouches },
-    { label: "Motion checks", value: telemetry.stats.totalMotionEvents },
-    { label: "Orientation checks", value: telemetry.stats.totalOrientationEvents },
-    { label: "Background checks", value: telemetry.stats.totalVisibilityChanges },
-    { label: "Avg key hold", value: `${Math.round(telemetry.stats.averageDwell)} ms` },
-    { label: "Avg key gap", value: `${Math.round(telemetry.stats.averageFlight)} ms` },
-    { label: "Avg btn pressure", value: telemetry.stats.averageButtonPressure ? telemetry.stats.averageButtonPressure.toFixed(3) : 0 },
-    { label: "Dist jitter", value: telemetry.stats.distributionJitter ? telemetry.stats.distributionJitter.toFixed(3) : 0 },
-    { label: "Neuromusc Entropy", value: telemetry.stats.neuromuscularEntropy ? telemetry.stats.neuromuscularEntropy.toFixed(3) : 0 },
-    { label: "Scroll irregularity", value: telemetry.stats.scrollVariance.toFixed(5) },
-    { label: "Swipe curve", value: telemetry.stats.averageSwipeCurve },
-    { label: "Tap-Vib Correlation", value: telemetry.stats.totalTaps > 0 ? `${((telemetry.stats.correlatedTaps / telemetry.stats.totalTaps) * 100).toFixed(1)}%` : "0%" },
-    { label: "Touch Deformation", value: telemetry.stats.touchDeformations || 0 },
-    { label: "Multi-Touch Anomaly", value: telemetry.stats.multiTouchAnomalies || 0 },
-    { label: "Paste events", value: telemetry.stats.totalPasteEvents || 0 },
-    { label: "Autofill events", value: telemetry.stats.totalAutofillEvents || 0 },
-    { label: "GPS accuracy", value: telemetry.stats.gpsAccuracy ? `${telemetry.stats.gpsAccuracy.toFixed(1)} m` : "N/A" },
-    { label: "Battery level", value: telemetry.stats.batteryLevel !== null ? `${Math.round(telemetry.stats.batteryLevel * 100)}%` : "N/A" },
-    { label: "Screen brightness", value: telemetry.stats.screenBrightness !== null ? telemetry.stats.screenBrightness.toFixed(2) : "N/A" },
-    { label: "Device model", value: telemetry.stats.deviceModel },
-    { label: "OS version", value: telemetry.stats.osVersion },
-    { label: "Network type", value: telemetry.stats.networkType },
-    { label: "Avg touch hold", value: telemetry.stats.averageTouchHold ? `${Math.round(telemetry.stats.averageTouchHold)} ms` : "0 ms" },
-    { label: "Touch hold var", value: telemetry.stats.touchHoldVariance ? telemetry.stats.touchHoldVariance.toFixed(1) : 0 },
-    { label: "Touch precision", value: telemetry.stats.averageTouchPrecision ? `${telemetry.stats.averageTouchPrecision.toFixed(1)} px` : "0 px" },
-    { label: "Field dwell", value: telemetry.stats.averageFieldDwell ? `${Math.round(telemetry.stats.averageFieldDwell)} ms` : "0 ms" },
-    { label: "Field revisits", value: telemetry.stats.totalFieldRevisits || 0 },
-    { label: "Password unmask", value: telemetry.stats.passwordUnmaskCount || 0 },
-    { label: "Backspace bursts", value: telemetry.stats.backspaceBursts || 0 },
-    { label: "Digraph pairs", value: telemetry.stats.digraphCount || 0 },
+  const metricGroups = [
+    {
+      key: "metadata",
+      title: "Session Metadata",
+      color: "#888",
+      cards: [
+        { label: "Session ID", value: sessionId || "N/A" },
+        { label: "Event count", value: telemetry.eventCount },
+        { label: "Platform", value: telemetry.isNative ? "Native" : "Web" },
+        { label: "Firestore", value: telemetry.firestoreEnabled ? "Enabled" : "Disabled" },
+      ],
+    },
+    {
+      key: "typing",
+      title: "Typing Behavior",
+      color: "#39e0ff",
+      cards: [
+        { label: "Typing actions", value: telemetry.stats.totalKeystrokes },
+        { label: "Text fixes", value: telemetry.stats.totalCorrections },
+        { label: "Avg key hold", value: `${Math.round(telemetry.stats.averageDwell)} ms` },
+        { label: "Avg key gap", value: `${Math.round(telemetry.stats.averageFlight)} ms` },
+        { label: "Neuromusc Entropy", value: telemetry.stats.neuromuscularEntropy ? telemetry.stats.neuromuscularEntropy.toFixed(3) : 0 },
+        { label: "Dist jitter", value: telemetry.stats.distributionJitter ? telemetry.stats.distributionJitter.toFixed(3) : 0 },
+        { label: "Paste events", value: telemetry.stats.totalPasteEvents || 0 },
+        { label: "Autofill events", value: telemetry.stats.totalAutofillEvents || 0 },
+        { label: "Backspace bursts", value: telemetry.stats.backspaceBursts || 0 },
+        { label: "Single backspaces", value: telemetry.stats.singleBackspaces || 0 },
+        { label: "Backspace burst ratio", value: telemetry.stats.backspaceBurstRatio ? telemetry.stats.backspaceBurstRatio.toFixed(4) : 0 },
+        { label: "Digraph pairs", value: telemetry.stats.digraphCount || 0 },
+        { label: "Digraph timing var", value: telemetry.stats.digraphTimingVariance ? telemetry.stats.digraphTimingVariance.toFixed(4) : 0 },
+        { label: "Digraph timing mean", value: telemetry.stats.digraphTimingMean ? `${telemetry.stats.digraphTimingMean.toFixed(2)} ms` : "0 ms" },
+      ],
+    },
+    {
+      key: "touch",
+      title: "Touch & Navigation",
+      color: "#b27bff",
+      cards: [
+        { label: "Login attempts", value: telemetry.stats.totalLoginAttempts },
+        { label: "Login problems", value: telemetry.stats.totalLoginErrors },
+        { label: "Form reviews", value: telemetry.stats.totalReviewChecks },
+        { label: "Transfers done", value: telemetry.stats.totalTransfers },
+        { label: "Swipe incomplete", value: telemetry.stats.incompleteSwipes },
+        { label: "Swipe completes", value: telemetry.stats.completedSwipes },
+        { label: "Swipe curve", value: telemetry.stats.averageSwipeCurve },
+        { label: "Screen jumps", value: telemetry.stats.totalNavTouches },
+        { label: "Avg btn pressure", value: telemetry.stats.averageButtonPressure ? telemetry.stats.averageButtonPressure.toFixed(3) : 0 },
+        { label: "Tap-Vib Correlation", value: telemetry.stats.totalTaps > 0 ? `${((telemetry.stats.correlatedTaps / telemetry.stats.totalTaps) * 100).toFixed(1)}%` : "0%" },
+        { label: "Touch Deformation", value: telemetry.stats.touchDeformations || 0 },
+        { label: "Multi-Touch Anomaly", value: telemetry.stats.multiTouchAnomalies || 0 },
+        { label: "Scroll irregularity", value: telemetry.stats.scrollVariance.toFixed(5) },
+      ],
+    },
+    {
+      key: "touchDynamics",
+      title: "Touch Dynamics",
+      color: "#b27bff",
+      cards: [
+        { label: "Avg touch hold", value: telemetry.stats.averageTouchHold ? `${Math.round(telemetry.stats.averageTouchHold)} ms` : "0 ms" },
+        { label: "Touch hold var", value: telemetry.stats.touchHoldVariance ? telemetry.stats.touchHoldVariance.toFixed(1) : 0 },
+        { label: "Touch precision", value: telemetry.stats.averageTouchPrecision ? `${telemetry.stats.averageTouchPrecision.toFixed(1)} px` : "0 px" },
+        { label: "Touch precision var", value: telemetry.stats.touchPrecisionVariance ? telemetry.stats.touchPrecisionVariance.toFixed(1) : 0 },
+        { label: "Field dwell", value: telemetry.stats.averageFieldDwell ? `${Math.round(telemetry.stats.averageFieldDwell)} ms` : "0 ms" },
+        { label: "Total field focus", value: telemetry.stats.totalFieldFocusTime ? `${Math.round(telemetry.stats.totalFieldFocusTime)} ms` : "0 ms" },
+        { label: "Field revisits", value: telemetry.stats.totalFieldRevisits || 0 },
+        { label: "Password unmask", value: telemetry.stats.passwordUnmaskCount || 0 },
+      ],
+    },
+    {
+      key: "device",
+      title: "Device & Environment",
+      color: "#39e0ff",
+      cards: [
+        { label: "Motion checks", value: telemetry.stats.totalMotionEvents },
+        { label: "Orientation checks", value: telemetry.stats.totalOrientationEvents },
+        { label: "Background checks", value: telemetry.stats.totalVisibilityChanges },
+        { label: "GPS lat", value: telemetry.stats.gpsLat ?? "N/A" },
+        { label: "GPS lng", value: telemetry.stats.gpsLng ?? "N/A" },
+        { label: "GPS accuracy", value: telemetry.stats.gpsAccuracy ? `${telemetry.stats.gpsAccuracy.toFixed(1)} m` : "N/A" },
+        { label: "Battery level", value: telemetry.stats.batteryLevel !== null ? `${Math.round(telemetry.stats.batteryLevel * 100)}%` : "N/A" },
+        { label: "Battery charging", value: telemetry.stats.batteryCharging === null ? "N/A" : telemetry.stats.batteryCharging ? "Yes" : "No" },
+        { label: "Screen brightness", value: telemetry.stats.screenBrightness !== null ? telemetry.stats.screenBrightness.toFixed(2) : "N/A" },
+        { label: "Device model", value: telemetry.stats.deviceModel },
+        { label: "OS version", value: telemetry.stats.osVersion },
+        { label: "Network type", value: telemetry.stats.networkType },
+      ],
+    },
+    {
+      key: "session",
+      title: "Session Lifecycle",
+      color: "#39e0ff",
+      cards: [
+        { label: "Session started", value: telemetry.stats.sessionStartedAt || "N/A" },
+        { label: "Session ended", value: telemetry.stats.sessionEndedAt || "N/A" },
+        { label: "Session duration", value: telemetry.stats.sessionDurationMs ? `${(telemetry.stats.sessionDurationMs / 1000).toFixed(1)} s` : "0 s" },
+        { label: "is_human", value: 1 },
+      ],
+    },
   ];
 
   const handlePointerDown = useCallback((e: React.PointerEvent) => {
@@ -728,51 +802,34 @@ export default function BankingSimPage() {
               </div>
             </div>
 
-            {/* Grouped Metrics */}
-            <div className="mb-4">
-              <p className="mb-3 text-xs font-semibold uppercase tracking-[0.15em] text-[#39e0ff]">Typing Behavior</p>
-              <div className="grid gap-3 sm:grid-cols-2 md:grid-cols-4">
-                {metricCards.slice(0, 6).map((m) => (
-                  <div key={m.label} className="rounded-2xl border border-white/[0.06] bg-white/[0.03] p-4">
-                    <span className="block text-xs text-muted">{m.label}</span>
-                    <strong className="text-lg text-white">{m.value}</strong>
+            {/* Collapsible Metric Groups */}
+            {metricGroups.map((group) => (
+              <div key={group.key} className="mb-4">
+                <button
+                  onClick={() => toggleGroup(group.key)}
+                  className="mb-3 flex w-full items-center gap-2 text-left"
+                >
+                  <ChevronDown
+                    size={16}
+                    className="transition-transform"
+                    style={{ transform: openGroups[group.key] ? "rotate(0deg)" : "rotate(-90deg)", color: group.color }}
+                  />
+                  <p className="text-xs font-semibold uppercase tracking-[0.15em]" style={{ color: group.color }}>
+                    {group.title} ({group.cards.length})
+                  </p>
+                </button>
+                {openGroups[group.key] && (
+                  <div className="grid gap-3 sm:grid-cols-2 md:grid-cols-4">
+                    {group.cards.map((m) => (
+                      <div key={m.label} className="rounded-2xl border border-white/[0.06] bg-white/[0.03] p-4">
+                        <span className="block text-xs text-muted">{m.label}</span>
+                        <strong className="text-lg text-white">{m.value}</strong>
+                      </div>
+                    ))}
                   </div>
-                ))}
+                )}
               </div>
-            </div>
-            <div className="mb-4">
-              <p className="mb-3 text-xs font-semibold uppercase tracking-[0.15em] text-[#b27bff]">Touch & Navigation</p>
-              <div className="grid gap-3 sm:grid-cols-2 md:grid-cols-4">
-                {metricCards.slice(6, 18).map((m) => (
-                  <div key={m.label} className="rounded-2xl border border-white/[0.06] bg-white/[0.03] p-4">
-                    <span className="block text-xs text-muted">{m.label}</span>
-                    <strong className="text-lg text-white">{m.value}</strong>
-                  </div>
-                ))}
-              </div>
-            </div>
-            <div className="mb-4">
-              <p className="mb-3 text-xs font-semibold uppercase tracking-[0.15em] text-[#39e0ff]">Device & Environment</p>
-              <div className="grid gap-3 sm:grid-cols-2 md:grid-cols-4">
-                {metricCards.slice(18, 29).map((m) => (
-                  <div key={m.label} className="rounded-2xl border border-white/[0.06] bg-white/[0.03] p-4">
-                    <span className="block text-xs text-muted">{m.label}</span>
-                    <strong className="text-lg text-white">{m.value}</strong>
-                  </div>
-                ))}
-              </div>
-            </div>
-            <div className="mb-4">
-              <p className="mb-3 text-xs font-semibold uppercase tracking-[0.15em] text-[#b27bff]">Touch Dynamics</p>
-              <div className="grid gap-3 sm:grid-cols-2 md:grid-cols-4">
-                {metricCards.slice(29).map((m) => (
-                  <div key={m.label} className="rounded-2xl border border-white/[0.06] bg-white/[0.03] p-4">
-                    <span className="block text-xs text-muted">{m.label}</span>
-                    <strong className="text-lg text-white">{m.value}</strong>
-                  </div>
-                ))}
-              </div>
-            </div>
+            ))
 
             <div className="mt-6 rounded-2xl border border-white/[0.06] bg-white/[0.03] p-5">
               <p className="text-sm leading-relaxed text-muted">
