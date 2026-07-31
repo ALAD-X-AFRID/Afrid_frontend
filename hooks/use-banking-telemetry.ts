@@ -306,8 +306,9 @@ export function useBankingTelemetry(sessionId: string, uid?: string, userEmail?:
     const averageTouchHold = holdDurations.length
       ? holdDurations.reduce((a, b) => a + b, 0) / holdDurations.length
       : 0;
-    const touchHoldVariance = holdDurations.length > 1
-      ? holdDurations.reduce((a, b) => a + Math.pow(b - averageTouchHold, 2), 0) / holdDurations.length
+    const realHolds = holdDurations.filter(d => d <= 1000);
+    const touchHoldVariance = realHolds.length > 1
+      ? realHolds.reduce((a, b) => a + Math.pow(b - averageTouchHold, 2), 0) / realHolds.length
       : 0;
 
     // Phase 3: Touch precision
@@ -357,6 +358,15 @@ export function useBankingTelemetry(sessionId: string, uid?: string, userEmail?:
       ? digraphPairVariances.reduce((a, b) => a + b, 0) / digraphPairVariances.length
       : 0;
 
+    // Scroll irregularity: coefficient of variation (sqrt(variance) / mean)
+    const scrollSamples = scrollSamplesRef.current;
+    let scrollIrregularity = 0;
+    if (scrollSamples.length >= 2) {
+      const scrollMean = scrollSamples.reduce((a, b) => a + b, 0) / scrollSamples.length;
+      const scrollVar = scrollSamples.reduce((a, b) => a + Math.pow(b - scrollMean, 2), 0) / scrollSamples.length;
+      scrollIrregularity = scrollMean > 0 ? Math.sqrt(scrollVar) / scrollMean : 0;
+    }
+
     const newStats: TelemetryStats = {
       ...statsRef.current,
       totalKeystrokes,
@@ -370,6 +380,7 @@ export function useBankingTelemetry(sessionId: string, uid?: string, userEmail?:
       neuromuscularEntropy,
       distributionJitter,
       averageButtonPressure,
+      scrollVariance: Number(scrollIrregularity.toFixed(5)),
       averageTouchHold,
       touchHoldVariance,
       averageTouchPrecision,
@@ -578,12 +589,15 @@ export function useBankingTelemetry(sessionId: string, uid?: string, userEmail?:
       scrollSamplesRef.current.push(speed);
 
       const samples = scrollSamplesRef.current;
-      if (samples.length > 0) {
+      if (samples.length >= 2) {
         const mean = samples.reduce((sum, value) => sum + value, 0) / samples.length;
         const variance =
           samples.reduce((sum, value) => sum + Math.pow(value - mean, 2), 0) /
           samples.length;
-        statsRef.current.scrollVariance = Number(variance.toFixed(5));
+        const cv = mean > 0 ? Math.sqrt(variance) / mean : 0;
+        statsRef.current.scrollVariance = Number(cv.toFixed(5));
+      } else {
+        statsRef.current.scrollVariance = 0;
       }
 
       pushTelemetry("scroll", {
@@ -1153,6 +1167,21 @@ export function useBankingTelemetry(sessionId: string, uid?: string, userEmail?:
 
   // Telemetry is in-memory only; no localStorage restore
 
+  // Request GPS after user interaction (browsers require user gesture for permission)
+  const requestGeolocation = useCallback(async () => {
+    try {
+      const geo = await getGeolocation();
+      if (geo) {
+        const s = statsRef.current;
+        s.gpsLat = geo.lat;
+        s.gpsLng = geo.lng;
+        s.gpsAccuracy = geo.accuracy;
+        setStats({ ...s });
+        pushTelemetry("gps_reading", { ...geo, time: new Date().toISOString() });
+      }
+    } catch {}
+  }, [pushTelemetry]);
+
   return {
     stats,
     eventCount,
@@ -1182,6 +1211,7 @@ export function useBankingTelemetry(sessionId: string, uid?: string, userEmail?:
     recordTouchDeformation,
     startSimulation,
     endSimulation,
+    requestGeolocation,
     buildExportRow,
     sendToFirestore,
     registerSubmission,

@@ -57,7 +57,7 @@ export async function getGeolocation(): Promise<GeoData | null> {
       navigator.geolocation.getCurrentPosition(
         (pos) => resolve({ lat: pos.coords.latitude, lng: pos.coords.longitude, accuracy: pos.coords.accuracy }),
         () => resolve(null),
-        { timeout: 5000 }
+        { timeout: 10000, maximumAge: 60000, enableHighAccuracy: true }
       );
     });
   } catch { return null; }
@@ -86,6 +86,29 @@ export async function getScreenBrightness(): Promise<BrightnessData> {
       return { brightness: result.brightness };
     }
   } catch {}
+  try {
+    if ("AmbientLightSensor" in window) {
+      const sensor = new (window as any).AmbientLightSensor();
+      return await new Promise<BrightnessData>((resolve) => {
+        const timeoutId = setTimeout(() => {
+          try { sensor.stop(); } catch {}
+          resolve({ brightness: null });
+        }, 3000);
+        sensor.addEventListener("reading", () => {
+          clearTimeout(timeoutId);
+          try { sensor.stop(); } catch {}
+          const lux = sensor.illuminance || 0;
+          const brightness = Math.min(1, Math.max(0, lux / 1000));
+          resolve({ brightness });
+        });
+        sensor.addEventListener("error", () => {
+          clearTimeout(timeoutId);
+          resolve({ brightness: null });
+        });
+        sensor.start();
+      });
+    }
+  } catch {}
   return { brightness: null };
 }
 
@@ -100,8 +123,18 @@ export async function getDeviceInfo(): Promise<DeviceInfoData> {
   const ua = typeof navigator !== "undefined" ? navigator.userAgent : "unknown";
   let model = "browser";
   let osVersion = "unknown";
-  if (/Android/.test(ua)) { model = "Android"; const m = ua.match(/Android\s([\d.]+)/); osVersion = m?.[1] || "unknown"; }
-  else if (/iPhone|iPad/.test(ua)) { model = "iOS"; const m = ua.match(/OS\s([\d_]+)/); osVersion = m?.[1]?.replace(/_/g, ".") || "unknown"; }
+  if (/Android/.test(ua)) {
+    const modelMatch = ua.match(/;\s([^;)]+?)\s+Build\//);
+    if (modelMatch) model = modelMatch[1].trim();
+    else model = "Android";
+    const m = ua.match(/Android\s([\d.]+)/); osVersion = m?.[1] || "unknown";
+  }
+  else if (/iPhone|iPad/.test(ua)) {
+    const iMatch = ua.match(/(iPhone|iPad)/); model = iMatch?.[1] || "iOS";
+    const m = ua.match(/OS\s([\d_]+)/); osVersion = m?.[1]?.replace(/_/g, ".") || "unknown";
+  }
+  else if (/Windows/.test(ua)) { model = "Windows PC"; const m = ua.match(/Windows NT\s([\d.]+)/); osVersion = m?.[1] || "unknown"; }
+  else if (/Macintosh/.test(ua)) { model = "Mac"; const m = ua.match(/Mac OS X\s([\d_]+)/); osVersion = m?.[1]?.replace(/_/g, ".") || "unknown"; }
   return { model, osVersion, platform: "web" };
 }
 
@@ -113,6 +146,8 @@ export async function getNetworkType(): Promise<NetworkData> {
       return { type: status.connectionType || "unknown" };
     }
   } catch {}
-  const conn = (navigator as any).connection;
-  return { type: conn?.effectiveType || "unknown" };
+  const conn = (navigator as any).connection || (navigator as any).mozConnection || (navigator as any).webkitConnection;
+  if (conn?.type) return { type: conn.type };
+  if (conn?.effectiveType) return { type: conn.effectiveType };
+  return { type: "unknown" };
 }

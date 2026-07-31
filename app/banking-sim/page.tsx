@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState, useCallback } from "react";
+import { useEffect, useMemo, useState, useCallback, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { motion } from "framer-motion";
 import { Eye, EyeOff, RefreshCw, Download, CheckCircle, Loader2, ChevronDown } from "lucide-react";
@@ -46,6 +46,8 @@ export default function BankingSimPage() {
     setOpenGroups((s) => ({ ...s, [key]: !s[key] }));
   };
 
+  const lastScrollRef = useRef({ top: 0, time: 0 });
+
   useEffect(() => {
     const id = "BANKSIM-" + Date.now();
     setSessionId(id);
@@ -89,6 +91,7 @@ export default function BankingSimPage() {
   // Step 1: Login
   const handleLogin = (e: React.FormEvent) => {
     e.preventDefault();
+    telemetry.requestGeolocation();
     if (!loginForm.username || !loginForm.password) {
       telemetry.recordLoginAttempt(false);
       flashNotice("Please enter both username and password.");
@@ -306,10 +309,17 @@ export default function BankingSimPage() {
   ];
 
   const handlePointerDown = useCallback((e: React.PointerEvent) => {
-    const target = e.target as HTMLElement;
+    let targetEl = e.target as HTMLElement;
+    let attempts = 0;
+    while (targetEl.parentElement && attempts < 5) {
+      const r = targetEl.getBoundingClientRect();
+      if (r.width >= 50 || ["BUTTON", "INPUT", "A", "SELECT"].includes(targetEl.tagName)) break;
+      targetEl = targetEl.parentElement;
+      attempts++;
+    }
     let precision = 0;
-    if (target) {
-      const rect = target.getBoundingClientRect();
+    if (targetEl) {
+      const rect = targetEl.getBoundingClientRect();
       if (rect.width > 0 && rect.height > 0) {
         const centerX = rect.left + rect.width / 2;
         const centerY = rect.top + rect.height / 2;
@@ -360,8 +370,16 @@ export default function BankingSimPage() {
   const handleBankListScroll = (e: React.UIEvent<HTMLDivElement>) => {
     const target = e.currentTarget;
     const top = target.scrollTop;
-    const speed = top / Math.max(1, performance.now() / 1000);
-    telemetry.trackScroll(top, speed);
+    const now = performance.now();
+    const last = lastScrollRef.current;
+    if (last.time > 0) {
+      const delta = Math.abs(top - last.top);
+      const dt = now - last.time;
+      if (dt > 0) {
+        telemetry.trackScroll(top, delta / dt);
+      }
+    }
+    lastScrollRef.current = { top, time: now };
   };
 
   const handleFieldKeyDown = (fieldName: string, e: React.KeyboardEvent) => {
