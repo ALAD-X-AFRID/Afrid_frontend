@@ -829,7 +829,7 @@ export default function BankingSimPage() {
                   </div>
                 )}
               </div>
-            ))
+            ))}
 
             <div className="mt-6 rounded-2xl border border-white/[0.06] bg-white/[0.03] p-5">
               <p className="text-sm leading-relaxed text-muted">
