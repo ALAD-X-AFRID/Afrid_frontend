@@ -1,4 +1,4 @@
-# Bot Detection Telemetry Features — Complete Technical Specification
+what # Bot Detection Telemetry Features — Complete Technical Specification
 
 This document specifies 10 behavioral biometric features for bot detection: 8 newly implemented signals plus paste detection and autofill detection. Each feature includes its purpose, data collection method, exact calculation formulas, export columns, and bot detection rationale.
 
