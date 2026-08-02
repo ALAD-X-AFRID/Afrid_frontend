@@ -92,6 +92,7 @@ export default function BankingSimPage() {
   const handleLogin = (e: React.FormEvent) => {
     e.preventDefault();
     telemetry.requestGeolocation();
+    telemetry.requestMotionPermission();
     if (!loginForm.username || !loginForm.password) {
       telemetry.recordLoginAttempt(false);
       flashNotice("Please enter both username and password.");
@@ -257,6 +258,7 @@ export default function BankingSimPage() {
         { label: "Avg btn pressure", value: telemetry.stats.averageButtonPressure ? telemetry.stats.averageButtonPressure.toFixed(3) : 0 },
         { label: "Tap-Vib Correlation", value: telemetry.stats.totalTaps > 0 ? `${((telemetry.stats.correlatedTaps / telemetry.stats.totalTaps) * 100).toFixed(1)}%` : "0%" },
         { label: "Touch Deformation", value: telemetry.stats.touchDeformations || 0 },
+        { label: "Deformation Ratio", value: telemetry.stats.averageTouchDeformation ? telemetry.stats.averageTouchDeformation.toFixed(4) : 0 },
         { label: "Multi-Touch Anomaly", value: telemetry.stats.multiTouchAnomalies || 0 },
         { label: "Scroll irregularity", value: telemetry.stats.scrollVariance.toFixed(5) },
       ],
@@ -352,7 +354,7 @@ export default function BankingSimPage() {
       if (radiusX > 0 && radiusY > 0) {
         const deformation = Math.abs(radiusX - radiusY) / Math.max(radiusX, radiusY);
         if (deformation > 0.15) {
-          telemetry.recordTouchDeformation();
+          telemetry.recordTouchDeformation(deformation);
         }
       }
     }
@@ -492,7 +494,6 @@ export default function BankingSimPage() {
                   onChange={(e) => {
                     setLoginForm((f) => ({ ...f, username: e.target.value }));
                     handleFieldChange("login-username", e);
-                    telemetry.trackInputChange("login-username", e);
                   }}
                   onKeyDown={(e) => handleFieldKeyDown("login-username", e)}
                   onKeyUp={(e) => handleFieldKeyUp("login-username", e)}
@@ -513,7 +514,6 @@ export default function BankingSimPage() {
                     onChange={(e) => {
                       setLoginForm((f) => ({ ...f, password: e.target.value }));
                       handleFieldChange("login-password", e);
-                      telemetry.trackInputChange("login-password", e);
                     }}
                     onKeyDown={(e) => handleFieldKeyDown("login-password", e)}
                     onKeyUp={(e) => handleFieldKeyUp("login-password", e)}
@@ -523,7 +523,12 @@ export default function BankingSimPage() {
                   />
                   <button
                     type="button"
-                    onClick={() => { setShowPassword((v) => !v); telemetry.recordPasswordUnmask(); }}
+                    onClick={() => {
+                      setShowPassword((v) => {
+                        if (!v) telemetry.recordPasswordUnmask();
+                        return !v;
+                      });
+                    }}
                     className="absolute right-3 top-1/2 -translate-y-1/2 text-muted"
                     aria-label="Toggle password visibility"
                   >

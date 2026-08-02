@@ -41,6 +41,7 @@ type TelemetryStats = {
   correlatedTaps: number;
   totalTaps: number;
   touchDeformations: number;
+  averageTouchDeformation: number;
   multiTouchAnomalies: number;
   totalPasteEvents: number;
   totalAutofillEvents: number;
@@ -104,9 +105,6 @@ type SensorState = {
   tapAlreadyCorrelated: boolean;
   accelMagnitudes: number[];
   gyroMagnitudes: number[];
-  totalJitter: number;
-  jitterSamples: number;
-  lastAcceleration?: { x: number; y: number; z: number };
 };
 
 const defaultStats: TelemetryStats = {
@@ -130,6 +128,7 @@ const defaultStats: TelemetryStats = {
   correlatedTaps: 0,
   totalTaps: 0,
   touchDeformations: 0,
+  averageTouchDeformation: 0,
   multiTouchAnomalies: 0,
   totalPasteEvents: 0,
   totalAutofillEvents: 0,
@@ -183,8 +182,6 @@ export function useBankingTelemetry(sessionId: string, uid?: string, userEmail?:
     tapAlreadyCorrelated: false,
     accelMagnitudes: [],
     gyroMagnitudes: [],
-    totalJitter: 0,
-    jitterSamples: 0,
   });
   const simulationEndedRef = useRef(false);
   const simulationStartedRef = useRef(false);
@@ -195,6 +192,8 @@ export function useBankingTelemetry(sessionId: string, uid?: string, userEmail?:
   const touchHoldDurationsRef = useRef<number[]>([]);
   // Phase 3: Touch precision refs
   const touchPrecisionRef = useRef<number[]>([]);
+  // Touch deformation ratio refs
+  const touchDeformationRatiosRef = useRef<number[]>([]);
   // Phase 4 & 5: Field focus/blur/revisit refs
   const fieldFocusRef = useRef<Record<string, { focusAt: number | null; totalFocusMs: number; visitCount: number }>>({});
   // Phase 6: Password unmask refs
@@ -281,8 +280,15 @@ export function useBankingTelemetry(sessionId: string, uid?: string, userEmail?:
 
     let distributionJitter = 0;
     if (eventsRef.current.length > 2) {
+      const userEventTypes = new Set([
+        "keystroke", "scroll", "nav_touch", "swipe", "login_success", "login_error",
+        "transfer_success", "transfer_review_opened", "paste", "autofill", "correction",
+        "password_unmask", "bank_selected", "bank_search", "bank_selection_confirmed",
+      ]);
       const times = eventsRef.current
+        .filter((e) => userEventTypes.has(e.type))
         .map((e) => new Date(e.timestamp).getTime())
+        .filter((v) => Number.isFinite(v))
         .sort((a, b) => a - b);
       const deltas: number[] = [];
       for (let i = 1; i < times.length; i++) {
@@ -306,9 +312,13 @@ export function useBankingTelemetry(sessionId: string, uid?: string, userEmail?:
     const averageTouchHold = holdDurations.length
       ? holdDurations.reduce((a, b) => a + b, 0) / holdDurations.length
       : 0;
+    // Variance: filter out holds > 1000ms (long presses/swipes), use filtered mean
     const realHolds = holdDurations.filter(d => d <= 1000);
+    const realHoldMean = realHolds.length
+      ? realHolds.reduce((a, b) => a + b, 0) / realHolds.length
+      : 0;
     const touchHoldVariance = realHolds.length > 1
-      ? realHolds.reduce((a, b) => a + Math.pow(b - averageTouchHold, 2), 0) / realHolds.length
+      ? realHolds.reduce((a, b) => a + Math.pow(b - realHoldMean, 2), 0) / realHolds.length
       : 0;
 
     // Phase 3: Touch precision
@@ -444,8 +454,8 @@ export function useBankingTelemetry(sessionId: string, uid?: string, userEmail?:
 
       statsRef.current.totalKeystrokes += 1;
 
-      // Phase 7: Backspace burst detection
-      if (event.key === "Backspace") {
+      // Phase 7: Backspace burst detection (also handle "Delete" key on iOS/some Android keyboards)
+      if (event.key === "Backspace" || event.key === "Delete") {
         const bsNow = performance.now();
         backspaceTimestampsRef.current.push(bsNow);
         const ts = backspaceTimestampsRef.current;
@@ -453,7 +463,7 @@ export function useBankingTelemetry(sessionId: string, uid?: string, userEmail?:
           const last3 = ts.slice(-3);
           if (last3[2] - last3[0] <= 500) {
             backspaceBurstsRef.current += 1;
-            backspaceTimestampsRef.current = ts.slice(0, -3);
+            backspaceTimestampsRef.current = [];
           } else {
             singleBackspacesRef.current += 1;
             backspaceTimestampsRef.current = ts.slice(-1);
@@ -511,7 +521,7 @@ export function useBankingTelemetry(sessionId: string, uid?: string, userEmail?:
         persistTelemetry();
       }
 
-      if (inputType === "insertReplacementText") {
+      if (inputType === "insertReplacementText" || (inputType === "insertCompositionText" && current.length - state.previousValue.length > 1)) {
         statsRef.current.totalAutofillEvents += 1;
         pushTelemetry("autofill", {
           field: fieldName,
@@ -756,16 +766,8 @@ export function useBankingTelemetry(sessionId: string, uid?: string, userEmail?:
       sensor.lastMotionAt = now;
       sensor.motionEvents += 1;
 
-      const currentAcc = { x, y, z };
-      if (sensor.lastAcceleration) {
-        const deltaX = currentAcc.x - sensor.lastAcceleration.x;
-        const deltaY = currentAcc.y - sensor.lastAcceleration.y;
-        const deltaZ = currentAcc.z - sensor.lastAcceleration.z;
-        const jitter = Math.sqrt(deltaX * deltaX + deltaY * deltaY + deltaZ * deltaZ);
-        sensor.totalJitter += jitter;
-        sensor.jitterSamples += 1;
-      }
-      sensor.lastAcceleration = currentAcc;
+      const accMag = Math.sqrt(x * x + y * y + z * z);
+      sensor.accelMagnitudes.push(accMag);
 
       pushTelemetry("device_motion", {
         x,
@@ -889,9 +891,14 @@ export function useBankingTelemetry(sessionId: string, uid?: string, userEmail?:
     refreshTelemetryDisplay();
   }, [refreshTelemetryDisplay]);
 
-  const recordTouchDeformation = useCallback(() => {
+  const recordTouchDeformation = useCallback((deformationRatio?: number) => {
     if (simulationEndedRef.current) return;
     statsRef.current.touchDeformations = (statsRef.current.touchDeformations || 0) + 1;
+    if (deformationRatio !== undefined && deformationRatio >= 0) {
+      touchDeformationRatiosRef.current.push(deformationRatio);
+      const ratios = touchDeformationRatiosRef.current;
+      statsRef.current.averageTouchDeformation = Number((ratios.reduce((a, b) => a + b, 0) / ratios.length).toFixed(4));
+    }
     refreshTelemetryDisplay();
   }, [refreshTelemetryDisplay]);
 
@@ -980,6 +987,7 @@ export function useBankingTelemetry(sessionId: string, uid?: string, userEmail?:
       Number(s.scrollVariance.toFixed(5)),
       tapVibrationCorrelation,
       s.touchDeformations || 0,
+      Number((s.averageTouchDeformation || 0).toFixed(4)),
       s.multiTouchAnomalies || 0,
       s.totalPasteEvents || 0,
       s.totalAutofillEvents || 0,
@@ -1080,13 +1088,14 @@ export function useBankingTelemetry(sessionId: string, uid?: string, userEmail?:
   useEffect(() => {
     let cancelled = false;
     const collectDeviceInfo = async () => {
-      const [geo, battery, brightness, deviceInfo, network] = await Promise.all([
-        getGeolocation(),
+      const [battery, brightness, deviceInfo, network] = await Promise.all([
         getBatteryState(),
         getScreenBrightness(),
         getDeviceInfo(),
         getNetworkType(),
       ]);
+      // GPS on web requires user gesture — collected via requestGeolocation() on login instead
+      const geo = isNativePlatform() ? await getGeolocation() : null;
       if (cancelled) return;
       const s = statsRef.current;
       if (geo) { s.gpsLat = geo.lat; s.gpsLng = geo.lng; s.gpsAccuracy = geo.accuracy; }
@@ -1139,7 +1148,8 @@ export function useBankingTelemetry(sessionId: string, uid?: string, userEmail?:
     };
     const handleTouchCancel = () => {
       if (simulationEndedRef.current) return;
-      recordMultiTouch();
+      pushTelemetry("touch_cancel", { time: new Date().toISOString() });
+      persistTelemetry();
     };
 
     document.addEventListener("touchstart", handleTouchStart, { passive: true });
@@ -1182,6 +1192,21 @@ export function useBankingTelemetry(sessionId: string, uid?: string, userEmail?:
     } catch {}
   }, [pushTelemetry]);
 
+  // Request iOS motion/orientation permission after user gesture (iOS 13+ requires this)
+  const motionPermissionRequestedRef = useRef(false);
+  const requestMotionPermission = useCallback(async () => {
+    if (motionPermissionRequestedRef.current) return;
+    motionPermissionRequestedRef.current = true;
+    try {
+      if (typeof (DeviceMotionEvent as any).requestPermission === "function") {
+        await (DeviceMotionEvent as any).requestPermission();
+      }
+      if (typeof (DeviceOrientationEvent as any).requestPermission === "function") {
+        await (DeviceOrientationEvent as any).requestPermission();
+      }
+    } catch {}
+  }, []);
+
   return {
     stats,
     eventCount,
@@ -1212,6 +1237,7 @@ export function useBankingTelemetry(sessionId: string, uid?: string, userEmail?:
     startSimulation,
     endSimulation,
     requestGeolocation,
+    requestMotionPermission,
     buildExportRow,
     sendToFirestore,
     registerSubmission,

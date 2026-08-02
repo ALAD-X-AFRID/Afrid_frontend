@@ -16,7 +16,7 @@ gpsLat = pos.coords.latitude
 gpsLng = pos.coords.longitude
 gpsAccuracy = pos.coords.accuracy  // meters
 ```
-On native: uses `@capacitor/geolocation` plugin. On web: uses `navigator.geolocation` API (requires HTTPS and user permission).
+On native: uses `@capacitor/geolocation` plugin (collected on mount — no user gesture required). On web: uses `navigator.geolocation` API (requires HTTPS and user permission, collected via `requestGeolocation()` on login button click — browsers require a user gesture to prompt for GPS permission).
 
 ## SI Unit
 - GPS lat: degrees (°) — range -90 to 90

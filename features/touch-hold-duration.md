@@ -15,9 +15,10 @@ touchHoldDurations.push(holdDuration)
 // Metrics:
 averageTouchHold = mean(touchHoldDurations)
 
-// Variance (filtering out holds > 1000ms to exclude long presses):
+// Variance (filtering out holds > 1000ms to exclude long presses/swipes):
 realHolds = touchHoldDurations.filter(d => d <= 1000)
-touchHoldVariance = population_variance(realHolds)
+realHoldMean = mean(realHolds)  // mean computed from filtered set only
+touchHoldVariance = population_variance(realHolds, realHoldMean)
 ```
 
 ## SI Unit

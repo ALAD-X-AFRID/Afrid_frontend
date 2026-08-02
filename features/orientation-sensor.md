@@ -16,6 +16,8 @@ count (integer)
 ## Physical Device Used
 Gyroscope/compass (MEMS chip in smartphone/tablet). On web: `DeviceOrientationEvent` API. On native: `@capacitor/motion` plugin.
 
+**iOS requirement:** iOS 13+ requires calling `DeviceOrientationEvent.requestPermission()` after a user gesture (e.g., login button click) before orientation events are available. The simulation calls `requestMotionPermission()` on login to handle this. Without it, orientation sensors will NOT work on iOS Safari or iOS WebView.
+
 ## Export Columns
 | Column | Type | Description |
 |---|---|---|

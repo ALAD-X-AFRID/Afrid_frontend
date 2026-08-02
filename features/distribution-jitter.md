@@ -5,13 +5,18 @@ Measures the irregularity of time intervals between consecutive telemetry events
 
 ## How It Is Calculated
 ```
-timestamps = sorted list of all event timestamps (ms)
+// Only user-initiated events are included (excludes sensor readings that fire at fixed intervals)
+userEventTypes = {keystroke, scroll, nav_touch, swipe, login_success, login_error,
+                  transfer_success, transfer_review_opened, paste, autofill, correction,
+                  password_unmask, bank_selected, bank_search, bank_selection_confirmed}
+
+timestamps = sorted list of user event timestamps (ms)
 deltas = [timestamps[i] - timestamps[i-1] for i in 1..n]
 
 jitterSum = sum of |deltas[i] - deltas[i-1]| for i in 1..len(deltas)
 distributionJitter = jitterSum / (len(deltas) - 1)
 ```
-This is the mean absolute difference between consecutive inter-event intervals — a measure of timing irregularity.
+This is the mean absolute difference between consecutive inter-event intervals — a measure of timing irregularity. Sensor events (device_motion, device_orientation) are excluded because they fire at throttled regular intervals (250ms) which would dilute the jitter measurement and make human behavior appear more regular than it actually is.
 
 ## SI Unit
 milliseconds (ms)

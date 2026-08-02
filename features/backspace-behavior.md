@@ -5,25 +5,26 @@ Analyzes backspace usage patterns — distinguishing between single corrections 
 
 ## How It Is Calculated
 ```
-// On keyup (Backspace key):
+// On keyup (Backspace or Delete key — iOS uses "Delete"):
 backspaceTimestamps.push(now)
 
 // Classify as burst or single:
-if backspaceTimestamps.length >= 2:
-  timeSinceLastBackspace = now - backspaceTimestamps[-2]
-  if timeSinceLastBackspace < 150ms:
-    // Part of a burst
-    // Don't count as single
+if backspaceTimestamps.length >= 3:
+  last3 = backspaceTimestamps[-3:]
+  if last3[2] - last3[0] <= 500ms:
+    // 3+ rapid backspaces within 500ms = burst
+    backspaceBursts += 1
+    backspaceTimestamps = []  // clear all (prevents orphaned timestamps)
   else:
+    // Isolated single backspace
     singleBackspaces += 1
-
-// When a burst ends (gap > 150ms after consecutive backspaces):
-if burstCount >= 3:
-  backspaceBursts += 1
+    backspaceTimestamps = [last]  // keep only the most recent
 
 // Final ratio:
 backspaceBurstRatio = backspaceBursts / (backspaceBursts + singleBackspaces)
 ```
+
+Note: Both "Backspace" and "Delete" keys are tracked — iOS and some Android keyboards fire "Delete" instead of "Backspace".
 
 ## SI Unit
 - Backspace bursts: count (integer)

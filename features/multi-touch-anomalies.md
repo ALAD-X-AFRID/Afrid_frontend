@@ -9,6 +9,7 @@ Counts instances where multiple simultaneous touch points were detected. More th
 if e.touches.length > 1:
   multiTouchAnomalies += 1
 ```
+Note: `touchcancel` events (system interruptions like incoming calls or notification overlays) are logged separately as `touch_cancel` events and are NOT counted as multi-touch anomalies.
 
 ## SI Unit
 count (integer)

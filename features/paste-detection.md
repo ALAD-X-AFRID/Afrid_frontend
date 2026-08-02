@@ -23,4 +23,4 @@ Keyboard (Ctrl+V) or touch clipboard. Detected via `input` DOM events comparing 
 | Paste detected | integer | Count of paste events |
 
 ## Bot Detection Rationale
-Humans sometimes paste (password managers, copying account numbers). Bots frequently paste or inject entire field values at once. A paste count equal to the number of fields, with zero manual keystrokes, is a strong bot signal. Occasional pastes mixed with typing is normal human behavior.
+Bots most commonly inject values directly into the DOM (`element.value = "..."` + dispatch change event), which produces zero keystrokes, zero paste events, and zero autofill events — the primary detection signal is zero keystrokes with completed forms. Some bots simulate paste via clipboard API or `insertFromPaste` events to appear more human. Excessive pasting (all fields pasted, zero typed) is suspicious. Occasional pastes mixed with typing is normal human behavior (password managers, copying account numbers).

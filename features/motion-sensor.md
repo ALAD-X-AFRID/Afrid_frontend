@@ -16,6 +16,8 @@ count (integer)
 ## Physical Device Used
 Accelerometer (MEMS chip in smartphone/tablet). On web: `DeviceMotionEvent` API. On native: `@capacitor/motion` plugin.
 
+**iOS requirement:** iOS 13+ requires calling `DeviceMotionEvent.requestPermission()` after a user gesture (e.g., login button click) before motion events are available. The simulation calls `requestMotionPermission()` on login to handle this. Without it, motion sensors will NOT work on iOS Safari or iOS WebView.
+
 ## Export Columns
 | Column | Type | Description |
 |---|---|---|

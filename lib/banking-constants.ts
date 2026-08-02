@@ -58,6 +58,7 @@ export const EXPORT_HEADERS = [
   "Scroll irregularity",
   "Tap-to-vibration correlation",
   "Touch area deformation",
+  "Touch area deformation ratio",
   "Multi-touch anomalies",
   "Paste detected",
   "Autofill detected",
