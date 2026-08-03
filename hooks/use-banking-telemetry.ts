@@ -214,6 +214,8 @@ export function useBankingTelemetry(sessionId: string, uid?: string, userEmail?:
   // iOS autofill polling: map field name to DOM input element
   const inputElementRef = useRef<Record<string, HTMLInputElement | null>>({});
   const pollIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  // iOS autofill polling: separate previous-value tracking (independent of trackInputChange's state.previousValue)
+  const pollingPreviousValueRef = useRef<Record<string, string>>({});
   // Paste detection: timestamp of last paste event (DOM paste event)
   const lastPasteAtRef = useRef<number>(0);
 
@@ -488,13 +490,10 @@ export function useBankingTelemetry(sessionId: string, uid?: string, userEmail?:
 
       statsRef.current.totalKeystrokes += 1;
 
-      // Phase 7: Backspace burst detection (also handle "Delete" key on iOS/some Android keyboards)
-      if (event.key === "Backspace" || event.key === "Delete") {
-        const bsNow = performance.now();
-        backspaceTimestampsRef.current.push(bsNow);
-        classifyBackspace();
-      } else {
-        // Non-backspace key — flush any pending backspace timestamps as singles
+      // Phase 7: Backspace burst detection is handled solely in trackInputChange
+      // (input events fire reliably for backspace on all platforms including Android).
+      // keyup duplicates timestamps on Android, so we only flush on non-backspace keys.
+      if (event.key !== "Backspace" && event.key !== "Delete") {
         flushPendingBackspaces();
       }
 
@@ -518,7 +517,7 @@ export function useBankingTelemetry(sessionId: string, uid?: string, userEmail?:
       persistTelemetry();
       refreshTelemetryDisplay();
     },
-    [pushTelemetry, persistTelemetry, refreshTelemetryDisplay]
+    [pushTelemetry, persistTelemetry, refreshTelemetryDisplay, flushPendingBackspaces]
   );
 
   // Paste detection via DOM paste event — fires reliably on long-press → "Paste" popup (mobile) and Ctrl+V (desktop)
@@ -565,8 +564,12 @@ export function useBankingTelemetry(sessionId: string, uid?: string, userEmail?:
         (inputType === "unknown" && lengthDelta < 0);
       if (isDeleteInput) {
         const bsNow = performance.now();
-        backspaceTimestampsRef.current.push(bsNow);
-        classifyBackspace();
+        const ts = backspaceTimestampsRef.current;
+        // Dedup guard: skip if within 30ms of last timestamp (Android may fire twice for one deletion)
+        if (ts.length === 0 || bsNow - ts[ts.length - 1] > 30) {
+          backspaceTimestampsRef.current.push(bsNow);
+          classifyBackspace();
+        }
       } else if (lengthDelta >= 0) {
         // Non-delete input — flush any pending backspace timestamps as singles
         flushPendingBackspaces();
@@ -633,6 +636,9 @@ export function useBankingTelemetry(sessionId: string, uid?: string, userEmail?:
   // Register DOM input element for iOS autofill polling
   const registerInputElement = useCallback((fieldName: string, element: HTMLInputElement | null) => {
     inputElementRef.current[fieldName] = element;
+    if (element && pollingPreviousValueRef.current[fieldName] === undefined) {
+      pollingPreviousValueRef.current[fieldName] = element.value;
+    }
   }, []);
 
   // Button pressure tracking
@@ -985,6 +991,8 @@ export function useBankingTelemetry(sessionId: string, uid?: string, userEmail?:
 
     // iOS autofill polling: Safari Autofill / iCloud Keychain set input values
     // without firing DOM events. Poll every 500ms to detect multi-char jumps.
+    // Uses pollingPreviousValueRef (independent of trackInputChange's state.previousValue)
+    // so that change events from autofill don't sync previousValue before polling can detect the jump.
     pollIntervalRef.current = setInterval(() => {
       if (simulationEndedRef.current) return;
       for (const [fieldName, element] of Object.entries(inputElementRef.current)) {
@@ -992,10 +1000,11 @@ export function useBankingTelemetry(sessionId: string, uid?: string, userEmail?:
         const state = fieldStateRef.current[fieldName];
         if (!state) continue;
         const domValue = element.value;
-        const delta = domValue.length - state.previousValue.length;
+        const prevPollValue = pollingPreviousValueRef.current[fieldName] ?? "";
+        const delta = domValue.length - prevPollValue.length;
         const recentKeystroke = state.lastKeyUpAt !== null && (performance.now() - state.lastKeyUpAt < 200);
         // Only detect if value grew by 2+ chars with no recent keystroke (not from typing)
-        if (delta > 1 && !recentKeystroke && domValue !== state.previousValue) {
+        if (delta > 1 && !recentKeystroke && domValue !== prevPollValue) {
           statsRef.current.totalAutofillEvents += 1;
           statsRef.current.totalAutofilledCharacters += delta;
           pushTelemetry("autofill", {
@@ -1006,8 +1015,8 @@ export function useBankingTelemetry(sessionId: string, uid?: string, userEmail?:
           });
           persistTelemetry();
         }
-        // Sync previousValue with actual DOM value to prevent re-detection
-        state.previousValue = domValue;
+        // Sync polling previous value with actual DOM value
+        pollingPreviousValueRef.current[fieldName] = domValue;
       }
     }, 500);
   }, [pushTelemetry, persistTelemetry]);
