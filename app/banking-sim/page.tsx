@@ -237,6 +237,7 @@ export default function BankingSimPage() {
         { label: "Autofill events", value: telemetry.stats.totalAutofillEvents || 0 },
         { label: "Autofilled chars", value: telemetry.stats.totalAutofilledCharacters || 0 },
         { label: "Cut events", value: telemetry.stats.totalCutEvents || 0 },
+        { label: "Copy events", value: telemetry.stats.totalCopyEvents || 0 },
         { label: "Backspace bursts", value: telemetry.stats.backspaceBursts || 0 },
         { label: "Single backspaces", value: telemetry.stats.singleBackspaces || 0 },
         { label: "Backspace burst ratio", value: telemetry.stats.backspaceBurstRatio ? telemetry.stats.backspaceBurstRatio.toFixed(4) : 0 },
@@ -352,8 +353,8 @@ export default function BankingSimPage() {
       const touch = e.touches[0];
       const force = (touch as any).force || 0.5;
       telemetry.trackButtonPressure(force);
-      const radiusX = (touch as any).radiusX || 0;
-      const radiusY = (touch as any).radiusY || 0;
+      const radiusX = (touch as any).radiusX || (touch as any).webkitRadiusX || 0;
+      const radiusY = (touch as any).radiusY || (touch as any).webkitRadiusY || 0;
       if (radiusX > 0 && radiusY > 0) {
         const deformation = Math.abs(radiusX - radiusY) / Math.max(radiusX, radiusY);
         if (deformation > 0.15) {
@@ -496,6 +497,7 @@ export default function BankingSimPage() {
                   value={loginForm.username}
                   ref={(el) => telemetry.registerInputElement("login-username", el)}
                   onPaste={(e) => telemetry.trackPaste("login-username", e)}
+                  onCopy={(e) => telemetry.trackCopy("login-username", e)}
                   onChange={(e) => {
                     setLoginForm((f) => ({ ...f, username: e.target.value }));
                     handleFieldChange("login-username", e);
@@ -518,6 +520,7 @@ export default function BankingSimPage() {
                     value={loginForm.password}
                     ref={(el) => telemetry.registerInputElement("login-password", el)}
                     onPaste={(e) => telemetry.trackPaste("login-password", e)}
+                  onCopy={(e) => telemetry.trackCopy("login-password", e)}
                     onChange={(e) => {
                       setLoginForm((f) => ({ ...f, password: e.target.value }));
                       handleFieldChange("login-password", e);
@@ -579,6 +582,7 @@ export default function BankingSimPage() {
                   value={transfer.name}
                   ref={(el) => telemetry.registerInputElement("recipient-name", el)}
                   onPaste={(e) => telemetry.trackPaste("recipient-name", e)}
+                  onCopy={(e) => telemetry.trackCopy("recipient-name", e)}
                   onChange={(e) => {
                     setTransfer((t) => ({ ...t, name: e.target.value }));
                     handleFieldChange("recipient-name", e);
@@ -599,6 +603,7 @@ export default function BankingSimPage() {
                   value={transfer.account}
                   ref={(el) => telemetry.registerInputElement("recipient-account", el)}
                   onPaste={(e) => telemetry.trackPaste("recipient-account", e)}
+                  onCopy={(e) => telemetry.trackCopy("recipient-account", e)}
                   onChange={(e) => {
                     setTransfer((t) => ({ ...t, account: e.target.value }));
                     handleFieldChange("recipient-account", e);
@@ -619,6 +624,7 @@ export default function BankingSimPage() {
                   value={transfer.amount}
                   ref={(el) => telemetry.registerInputElement("transfer-amount", el)}
                   onPaste={(e) => telemetry.trackPaste("transfer-amount", e)}
+                  onCopy={(e) => telemetry.trackCopy("transfer-amount", e)}
                   onChange={(e) => {
                     setTransfer((t) => ({ ...t, amount: e.target.value }));
                     handleFieldChange("transfer-amount", e);
@@ -714,6 +720,7 @@ export default function BankingSimPage() {
                   value={bankQuery}
                   ref={(el) => telemetry.registerInputElement("bank-search-input", el)}
                   onPaste={(e) => telemetry.trackPaste("bank-search-input", e)}
+                  onCopy={(e) => telemetry.trackCopy("bank-search-input", e)}
                   onChange={(e) => {
                     handleBankSearch(e.target.value);
                     handleFieldChange("bank-search-input", e);

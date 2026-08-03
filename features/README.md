@@ -40,8 +40,9 @@ Complete index of all tracked telemetry features for bot detection in the bankin
 | 32 | Password Unmask | Password unmask count | [password-unmask.md](password-unmask.md) | count |
 | 33 | Backspace Behavior | Backspace bursts, Single backspaces, Backspace burst ratio, Cut events | [backspace-behavior.md](backspace-behavior.md) | count / count / ratio / count |
 | 34 | Digraph Timing | Digraph pairs, Digraph timing variance, Digraph timing mean (ms) | [digraph-timing.md](digraph-timing.md) | count / ms² / ms |
+| 35 | Copy Detection | Copy events | [copy-detection.md](copy-detection.md) | count |
 
-## Total Export Columns: 60
+## Total Export Columns: 61
 
 Each feature group has a dedicated markdown file with:
 - **What it is about** — plain English description

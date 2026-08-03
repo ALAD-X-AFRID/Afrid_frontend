@@ -65,6 +65,7 @@ export const EXPORT_HEADERS = [
   "Autofill detected",
   "Autofilled characters",
   "Cut events",
+  "Copy events",
   "GPS lat",
   "GPS lng",
   "GPS accuracy",

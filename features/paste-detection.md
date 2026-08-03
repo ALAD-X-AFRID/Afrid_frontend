@@ -1,7 +1,7 @@
 # Paste Detection
 
 ## What It Is About
-Counts how many times the user pasted text into input fields and how many characters were pasted in total. Pasting credentials or account numbers may indicate use of a password manager, copy-paste from another source, or bot automation.
+Counts how many times the user pasted text into input fields and how many characters were pasted in total. Pasting credentials or account numbers may indicate use of a password manager, copy-paste from another source, or bot automation. Copy events (Ctrl+C / long-press → "Copy") are tracked separately — see [copy-detection.md](copy-detection.md).
 
 ## How It Is Calculated
 ```

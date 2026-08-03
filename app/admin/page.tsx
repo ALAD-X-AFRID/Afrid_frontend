@@ -54,6 +54,7 @@ export default function AdminPage() {
       totalAutofillEvents: botType === "highspeed" ? 3 : 0,
       totalAutofilledCharacters: botType === "highspeed" ? 30 : 0,
       totalCutEvents: botType === "baseline" ? 1 : 0,
+      totalCopyEvents: botType === "baseline" ? 2 : botType === "smart" ? 1 : 0,
       averageButtonPressure: botType === "highspeed" ? 0.1 : botType === "smart" ? 0.45 : 0.62,
       neuromuscularEntropy: botType === "highspeed" ? 0.01 : botType === "smart" ? 0.34 : 1.12,
       distributionJitter: botType === "highspeed" ? 5 : botType === "smart" ? 45 : 180,
@@ -120,6 +121,7 @@ export default function AdminPage() {
         botMetrics.totalAutofillEvents,
         botMetrics.totalAutofilledCharacters,
         botMetrics.totalCutEvents,
+        botMetrics.totalCopyEvents,
         "", // GPS lat
         "", // GPS lng
         "", // GPS accuracy

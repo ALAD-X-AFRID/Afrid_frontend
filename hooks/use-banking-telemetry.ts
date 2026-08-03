@@ -48,6 +48,7 @@ type TelemetryStats = {
   totalAutofillEvents: number;
   totalAutofilledCharacters: number;
   totalCutEvents: number;
+  totalCopyEvents: number;
   averageButtonPressure: number;
   neuromuscularEntropy: number;
   distributionJitter: number;
@@ -138,6 +139,7 @@ const defaultStats: TelemetryStats = {
   totalAutofillEvents: 0,
   totalAutofilledCharacters: 0,
   totalCutEvents: 0,
+  totalCopyEvents: 0,
   averageButtonPressure: 0,
   neuromuscularEntropy: 0,
   distributionJitter: 0,
@@ -536,6 +538,23 @@ export function useBankingTelemetry(sessionId: string, uid?: string, userEmail?:
     [pushTelemetry, persistTelemetry, refreshTelemetryDisplay]
   );
 
+  // Copy detection via DOM copy event — fires when user selects text and copies (Ctrl+C or long-press → Copy)
+  const trackCopy = useCallback(
+    (fieldName: string, event: React.ClipboardEvent<HTMLInputElement>) => {
+      if (simulationEndedRef.current) return;
+      const copiedText = event.clipboardData?.getData("text") || "";
+      statsRef.current.totalCopyEvents += 1;
+      pushTelemetry("copy", {
+        field: fieldName,
+        copiedLength: copiedText.length,
+        time: new Date().toISOString(),
+      });
+      persistTelemetry();
+      refreshTelemetryDisplay();
+    },
+    [pushTelemetry, persistTelemetry, refreshTelemetryDisplay]
+  );
+
   const trackInputChange = useCallback(
     (fieldName: string, event: React.ChangeEvent<HTMLInputElement>) => {
       if (simulationEndedRef.current) return;
@@ -570,7 +589,7 @@ export function useBankingTelemetry(sessionId: string, uid?: string, userEmail?:
         });
         persistTelemetry();
       } else if (isDeleteInput) {
-        if (lengthDelta <= -3) {
+        if (lengthDelta <= -2) {
           backspaceBurstsRef.current += 1;
         } else {
           singleBackspacesRef.current += 1;
@@ -579,7 +598,7 @@ export function useBankingTelemetry(sessionId: string, uid?: string, userEmail?:
 
       // Paste is detected via the DOM paste event (trackPaste) — not inputType.
       // If a paste fired recently, skip autofill detection for this change.
-      const recentPaste = lastPasteAtRef.current > 0 && (performance.now() - lastPasteAtRef.current < 500);
+      const recentPaste = lastPasteAtRef.current > 0 && (performance.now() - lastPasteAtRef.current < 1500);
 
       // Autofill detection — value jumped by 2+ chars with no paste event and no recent keystroke
       const autofillInputTypes = new Set([
@@ -1122,6 +1141,7 @@ export function useBankingTelemetry(sessionId: string, uid?: string, userEmail?:
       s.totalAutofillEvents || 0,
       s.totalAutofilledCharacters || 0,
       s.totalCutEvents || 0,
+      s.totalCopyEvents || 0,
       s.gpsLat ?? "",
       s.gpsLng ?? "",
       s.gpsAccuracy ?? "",
@@ -1347,6 +1367,7 @@ export function useBankingTelemetry(sessionId: string, uid?: string, userEmail?:
     trackKeyDown,
     trackKeyUp,
     trackPaste,
+    trackCopy,
     trackInputChange,
     registerField,
     registerInputElement,

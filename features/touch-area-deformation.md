@@ -27,7 +27,7 @@ Ranges from 0.0 (perfectly circular) to 1.0 (line-shaped contact).
 - Touch area deformation ratio: dimensionless ratio (0.0–1.0)
 
 ## Physical Device Used
-Capacitive touchscreen with touch area reporting. On web: `Touch.radiusX` and `Touch.radiusY`. On native (APK): Capacitor WebView reports these values on Android. iOS Safari does not report touch radius (returns 0), so deformation will be 0 on iOS — this is a platform limitation.
+Capacitive touchscreen with touch area reporting. On web: `Touch.radiusX` and `Touch.radiusY`, with `webkitRadiusX`/`webkitRadiusY` fallback for Android WebView. On native (APK): Capacitor WebView reports these values on Android. iOS Safari does not report touch radius (returns 0), so deformation will be 0 on iOS — this is a platform limitation. Some Android phones also report 0 for all radius properties — this is a device-level limitation and cannot be worked around.
 
 ## Export Columns
 | Column | Type | Description |
