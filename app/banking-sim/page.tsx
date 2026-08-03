@@ -236,6 +236,7 @@ export default function BankingSimPage() {
         { label: "Pasted chars", value: telemetry.stats.totalPastedCharacters || 0 },
         { label: "Autofill events", value: telemetry.stats.totalAutofillEvents || 0 },
         { label: "Autofilled chars", value: telemetry.stats.totalAutofilledCharacters || 0 },
+        { label: "Cut events", value: telemetry.stats.totalCutEvents || 0 },
         { label: "Backspace bursts", value: telemetry.stats.backspaceBursts || 0 },
         { label: "Single backspaces", value: telemetry.stats.singleBackspaces || 0 },
         { label: "Backspace burst ratio", value: telemetry.stats.backspaceBurstRatio ? telemetry.stats.backspaceBurstRatio.toFixed(4) : 0 },

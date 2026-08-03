@@ -47,6 +47,7 @@ type TelemetryStats = {
   totalPastedCharacters: number;
   totalAutofillEvents: number;
   totalAutofilledCharacters: number;
+  totalCutEvents: number;
   averageButtonPressure: number;
   neuromuscularEntropy: number;
   distributionJitter: number;
@@ -136,6 +137,7 @@ const defaultStats: TelemetryStats = {
   totalPastedCharacters: 0,
   totalAutofillEvents: 0,
   totalAutofilledCharacters: 0,
+  totalCutEvents: 0,
   averageButtonPressure: 0,
   neuromuscularEntropy: 0,
   distributionJitter: 0,
@@ -218,6 +220,8 @@ export function useBankingTelemetry(sessionId: string, uid?: string, userEmail?:
   const pollingPreviousValueRef = useRef<Record<string, string>>({});
   // Paste detection: timestamp of last paste event (DOM paste event)
   const lastPasteAtRef = useRef<number>(0);
+  // Autofill dedup: shared timestamp so trackInputChange and iOS polling don't double-count
+  const lastAutofillAtRef = useRef<number>(0);
 
   const [stats, setStats] = useState<TelemetryStats>({ ...defaultStats });
   const [eventCount, setEventCount] = useState(0);
@@ -490,13 +494,6 @@ export function useBankingTelemetry(sessionId: string, uid?: string, userEmail?:
 
       statsRef.current.totalKeystrokes += 1;
 
-      // Phase 7: Backspace burst detection is handled solely in trackInputChange
-      // (input events fire reliably for backspace on all platforms including Android).
-      // keyup duplicates timestamps on Android, so we only flush on non-backspace keys.
-      if (event.key !== "Backspace" && event.key !== "Delete") {
-        flushPendingBackspaces();
-      }
-
       // Phase 8: Digraph timing
       if (flight !== null && state.keystrokes.length >= 2) {
         const prevKey = state.keystrokes[state.keystrokes.length - 2].key;
@@ -517,7 +514,7 @@ export function useBankingTelemetry(sessionId: string, uid?: string, userEmail?:
       persistTelemetry();
       refreshTelemetryDisplay();
     },
-    [pushTelemetry, persistTelemetry, refreshTelemetryDisplay, flushPendingBackspaces]
+    [pushTelemetry, persistTelemetry, refreshTelemetryDisplay]
   );
 
   // Paste detection via DOM paste event — fires reliably on long-press → "Paste" popup (mobile) and Ctrl+V (desktop)
@@ -558,21 +555,26 @@ export function useBankingTelemetry(sessionId: string, uid?: string, userEmail?:
 
       // Backspace/delete detection via input event (mobile soft keyboards often skip keydown/keyup)
       // On Android WebView, inputType may be "unknown" — fall back to value-length comparison
+      // Single-event burst detection: long-press backspace fires one input event deleting 3+ chars
+      const isCut = inputType === "deleteByCut";
       const isDeleteInput = inputType === "deleteContentBackward" ||
         inputType === "deleteContentForward" ||
-        inputType === "deleteByCut" ||
         (inputType === "unknown" && lengthDelta < 0);
-      if (isDeleteInput) {
-        const bsNow = performance.now();
-        const ts = backspaceTimestampsRef.current;
-        // Dedup guard: skip if within 30ms of last timestamp (Android may fire twice for one deletion)
-        if (ts.length === 0 || bsNow - ts[ts.length - 1] > 30) {
-          backspaceTimestampsRef.current.push(bsNow);
-          classifyBackspace();
+      if (isCut) {
+        statsRef.current.totalCutEvents += 1;
+        pushTelemetry("cut", {
+          field: fieldName,
+          inputType,
+          deletedLength: Math.abs(lengthDelta),
+          time: new Date().toISOString(),
+        });
+        persistTelemetry();
+      } else if (isDeleteInput) {
+        if (lengthDelta <= -3) {
+          backspaceBurstsRef.current += 1;
+        } else {
+          singleBackspacesRef.current += 1;
         }
-      } else if (lengthDelta >= 0) {
-        // Non-delete input — flush any pending backspace timestamps as singles
-        flushPendingBackspaces();
       }
 
       // Paste is detected via the DOM paste event (trackPaste) — not inputType.
@@ -594,6 +596,7 @@ export function useBankingTelemetry(sessionId: string, uid?: string, userEmail?:
       if (isAutofill) {
         statsRef.current.totalAutofillEvents += 1;
         statsRef.current.totalAutofilledCharacters += lengthDelta;
+        lastAutofillAtRef.current = performance.now();
         pushTelemetry("autofill", {
           field: fieldName,
           inputType,
@@ -617,7 +620,7 @@ export function useBankingTelemetry(sessionId: string, uid?: string, userEmail?:
 
       state.previousValue = current;
     },
-    [pushTelemetry, persistTelemetry, classifyBackspace, flushPendingBackspaces]
+    [pushTelemetry, persistTelemetry]
   );
 
   // Register field for tracking
@@ -1003,10 +1006,12 @@ export function useBankingTelemetry(sessionId: string, uid?: string, userEmail?:
         const prevPollValue = pollingPreviousValueRef.current[fieldName] ?? "";
         const delta = domValue.length - prevPollValue.length;
         const recentKeystroke = state.lastKeyUpAt !== null && (performance.now() - state.lastKeyUpAt < 200);
-        // Only detect if value grew by 2+ chars with no recent keystroke (not from typing)
-        if (delta > 1 && !recentKeystroke && domValue !== prevPollValue) {
+        // Only detect if value grew by 2+ chars with no recent keystroke and trackInputChange hasn't already detected it
+        const recentAutofill = lastAutofillAtRef.current > 0 && (performance.now() - lastAutofillAtRef.current < 500);
+        if (delta > 1 && !recentKeystroke && !recentAutofill && domValue !== prevPollValue) {
           statsRef.current.totalAutofillEvents += 1;
           statsRef.current.totalAutofilledCharacters += delta;
+          lastAutofillAtRef.current = performance.now();
           pushTelemetry("autofill", {
             field: fieldName,
             inputType: "polling_detected",
@@ -1110,6 +1115,7 @@ export function useBankingTelemetry(sessionId: string, uid?: string, userEmail?:
       s.totalPastedCharacters || 0,
       s.totalAutofillEvents || 0,
       s.totalAutofilledCharacters || 0,
+      s.totalCutEvents || 0,
       s.gpsLat ?? "",
       s.gpsLng ?? "",
       s.gpsAccuracy ?? "",

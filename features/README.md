@@ -38,10 +38,10 @@ Complete index of all tracked telemetry features for bot detection in the bankin
 | 30 | Field Dwell Time | Avg field dwell (ms), Total field focus (ms) | [field-dwell-time.md](field-dwell-time.md) | ms |
 | 31 | Field Revisits | Field revisits | [field-revisits.md](field-revisits.md) | count |
 | 32 | Password Unmask | Password unmask count | [password-unmask.md](password-unmask.md) | count |
-| 33 | Backspace Behavior | Backspace bursts, Single backspaces, Backspace burst ratio | [backspace-behavior.md](backspace-behavior.md) | count / count / ratio |
+| 33 | Backspace Behavior | Backspace bursts, Single backspaces, Backspace burst ratio, Cut events | [backspace-behavior.md](backspace-behavior.md) | count / count / ratio / count |
 | 34 | Digraph Timing | Digraph pairs, Digraph timing variance, Digraph timing mean (ms) | [digraph-timing.md](digraph-timing.md) | count / ms² / ms |
 
-## Total Export Columns: 59
+## Total Export Columns: 60
 
 Each feature group has a dedicated markdown file with:
 - **What it is about** — plain English description
@@ -55,7 +55,7 @@ Each feature group has a dedicated markdown file with:
 
 | Feature | Web | APK (Android) | APK (iOS) |
 |---|---|---|---|
-| Keystrokes, digraph, backspace | ✅ | ✅ (input event fallback) | ✅ |
+| Keystrokes, digraph, backspace, cut | ✅ | ✅ (input event, single-event burst) | ✅ |
 | Touch hold, precision | ✅ | ✅ | ✅ |
 | Touch area deformation | ✅ (Chrome) | ✅ | ❌ (no radiusX/Y) |
 | Motion sensor | ✅ (needs permission) | ✅ | ✅ (needs permission) |
@@ -65,4 +65,4 @@ Each feature group has a dedicated markdown file with:
 | Screen brightness | ✅ (AmbientLight) | ✅ | ❌ (no API) |
 | Network type | ✅ (Chrome/Edge) | ✅ | ✅ |
 | Paste (DOM paste event) | ✅ | ✅ | ✅ |
-| Autofill (inputType + polling) | ✅ | ✅ (inputType + value-jump) | ✅ (DOM polling) |
+| Autofill (inputType + polling, dedup) | ✅ | ✅ (inputType + value-jump) | ✅ (DOM polling, dedup) |
