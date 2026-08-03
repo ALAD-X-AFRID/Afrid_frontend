@@ -434,6 +434,30 @@ export function useBankingTelemetry(sessionId: string, uid?: string, userEmail?:
     []
   );
 
+  // Phase 7: Shared backspace burst classification helper
+  const classifyBackspace = useCallback(() => {
+    const ts = backspaceTimestampsRef.current;
+    if (ts.length >= 3) {
+      const last3 = ts.slice(-3);
+      if (last3[2] - last3[0] <= 500) {
+        backspaceBurstsRef.current += 1;
+        backspaceTimestampsRef.current = [];
+      } else {
+        singleBackspacesRef.current += 1;
+        backspaceTimestampsRef.current = ts.slice(-2);
+      }
+    }
+  }, []);
+
+  // Flush remaining pending backspace timestamps as singles (call on non-backspace key or session end)
+  const flushPendingBackspaces = useCallback(() => {
+    const ts = backspaceTimestampsRef.current;
+    if (ts.length > 0) {
+      singleBackspacesRef.current += ts.length;
+      backspaceTimestampsRef.current = [];
+    }
+  }, []);
+
   const trackKeyUp = useCallback(
     (fieldName: string, event: KeyboardEvent) => {
       if (simulationEndedRef.current) return;
@@ -458,17 +482,10 @@ export function useBankingTelemetry(sessionId: string, uid?: string, userEmail?:
       if (event.key === "Backspace" || event.key === "Delete") {
         const bsNow = performance.now();
         backspaceTimestampsRef.current.push(bsNow);
-        const ts = backspaceTimestampsRef.current;
-        if (ts.length >= 3) {
-          const last3 = ts.slice(-3);
-          if (last3[2] - last3[0] <= 500) {
-            backspaceBurstsRef.current += 1;
-            backspaceTimestampsRef.current = [];
-          } else {
-            singleBackspacesRef.current += 1;
-            backspaceTimestampsRef.current = ts.slice(-1);
-          }
-        }
+        classifyBackspace();
+      } else {
+        // Non-backspace key — flush any pending backspace timestamps as singles
+        flushPendingBackspaces();
       }
 
       // Phase 8: Digraph timing
@@ -509,6 +526,17 @@ export function useBankingTelemetry(sessionId: string, uid?: string, userEmail?:
       const state = fieldStateRef.current[fieldName];
       const current = event.target.value;
       const inputType = (event.nativeEvent as InputEvent).inputType || "unknown";
+      const lengthDelta = current.length - state.previousValue.length;
+
+      // Backspace/delete detection via input event (mobile soft keyboards often skip keydown/keyup)
+      if (inputType === "deleteContentBackward" || inputType === "deleteContentForward" || inputType === "deleteByCut") {
+        const bsNow = performance.now();
+        backspaceTimestampsRef.current.push(bsNow);
+        classifyBackspace();
+      } else if (lengthDelta >= 0) {
+        // Non-delete input — flush any pending backspace timestamps as singles
+        flushPendingBackspaces();
+      }
 
       if (inputType === "insertFromPaste") {
         statsRef.current.totalPasteEvents += 1;
@@ -521,7 +549,15 @@ export function useBankingTelemetry(sessionId: string, uid?: string, userEmail?:
         persistTelemetry();
       }
 
-      if (inputType === "insertReplacementText" || (inputType === "insertCompositionText" && current.length - state.previousValue.length > 1)) {
+      // Autofill detection — cover multiple browser/keyboard inputType values
+      const autofillInputTypes = new Set([
+        "insertReplacementText",
+        "insertCommittedText",
+        "insertFromDrop",
+      ]);
+      const isAutofill = autofillInputTypes.has(inputType) ||
+        (lengthDelta > 1 && (inputType === "insertCompositionText" || inputType === "insertText"));
+      if (isAutofill) {
         statsRef.current.totalAutofillEvents += 1;
         pushTelemetry("autofill", {
           field: fieldName,
@@ -546,7 +582,7 @@ export function useBankingTelemetry(sessionId: string, uid?: string, userEmail?:
 
       state.previousValue = current;
     },
-    [pushTelemetry, persistTelemetry]
+    [pushTelemetry, persistTelemetry, classifyBackspace, flushPendingBackspaces]
   );
 
   // Register field for tracking
@@ -915,6 +951,8 @@ export function useBankingTelemetry(sessionId: string, uid?: string, userEmail?:
   const endSimulation = useCallback(() => {
     if (simulationEndedRef.current) return;
     simulationEndedRef.current = true;
+    // Flush any pending backspace timestamps as singles before final computation
+    flushPendingBackspaces();
     const now = new Date().toISOString();
     statsRef.current.sessionEndedAt = now;
     const startMs = statsRef.current.sessionStartedAt
@@ -934,7 +972,7 @@ export function useBankingTelemetry(sessionId: string, uid?: string, userEmail?:
       endedAt: now,
       durationMs: statsRef.current.sessionDurationMs,
     });
-  }, [computeMetrics, pushTelemetry]);
+  }, [computeMetrics, pushTelemetry, flushPendingBackspaces]);
 
   // Build export row
   const buildExportRow = useCallback((): (string | number)[] => {
