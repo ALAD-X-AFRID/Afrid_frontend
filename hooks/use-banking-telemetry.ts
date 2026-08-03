@@ -595,7 +595,7 @@ export function useBankingTelemetry(sessionId: string, uid?: string, userEmail?:
       );
       if (isAutofill) {
         const lastForField = lastAutofillAtRef.current[fieldName] || 0;
-        if (performance.now() - lastForField < 500) {
+        if (performance.now() - lastForField < 1500) {
           // Duplicate change event for the same autofill — skip
         } else {
           statsRef.current.totalAutofillEvents += 1;
@@ -1013,7 +1013,7 @@ export function useBankingTelemetry(sessionId: string, uid?: string, userEmail?:
         const recentKeystroke = state.lastKeyUpAt !== null && (performance.now() - state.lastKeyUpAt < 200);
         // Only detect if value grew by 2+ chars with no recent keystroke and trackInputChange hasn't already detected it
         const lastForField = lastAutofillAtRef.current[fieldName] || 0;
-        const recentAutofill = performance.now() - lastForField < 500;
+        const recentAutofill = performance.now() - lastForField < 1500;
         if (delta > 1 && !recentKeystroke && !recentAutofill && domValue !== prevPollValue) {
           statsRef.current.totalAutofillEvents += 1;
           statsRef.current.totalAutofilledCharacters += delta;
