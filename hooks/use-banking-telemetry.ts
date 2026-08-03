@@ -207,7 +207,6 @@ export function useBankingTelemetry(sessionId: string, uid?: string, userEmail?:
   // Phase 6: Password unmask refs
   const passwordUnmaskCountRef = useRef(0);
   // Phase 7: Backspace burst refs
-  const backspaceTimestampsRef = useRef<number[]>([]);
   const backspaceBurstsRef = useRef(0);
   const singleBackspacesRef = useRef(0);
   // Phase 8: Digraph timing refs
@@ -299,7 +298,7 @@ export function useBankingTelemetry(sessionId: string, uid?: string, userEmail?:
     if (eventsRef.current.length > 2) {
       const userEventTypes = new Set([
         "keystroke", "scroll", "nav_touch", "swipe", "login_success", "login_error",
-        "transfer_success", "transfer_review_opened", "paste", "autofill", "correction",
+        "transfer_success", "transfer_review_opened", "paste", "copy", "cut", "autofill", "correction",
         "password_unmask", "bank_selected", "bank_search", "bank_selection_confirmed",
       ]);
       const times = eventsRef.current
@@ -451,30 +450,6 @@ export function useBankingTelemetry(sessionId: string, uid?: string, userEmail?:
     []
   );
 
-  // Phase 7: Shared backspace burst classification helper
-  const classifyBackspace = useCallback(() => {
-    const ts = backspaceTimestampsRef.current;
-    if (ts.length >= 3) {
-      const last3 = ts.slice(-3);
-      if (last3[2] - last3[0] <= 500) {
-        backspaceBurstsRef.current += 1;
-        backspaceTimestampsRef.current = [];
-      } else {
-        singleBackspacesRef.current += 1;
-        backspaceTimestampsRef.current = ts.slice(-2);
-      }
-    }
-  }, []);
-
-  // Flush remaining pending backspace timestamps as singles (call on non-backspace key or session end)
-  const flushPendingBackspaces = useCallback(() => {
-    const ts = backspaceTimestampsRef.current;
-    if (ts.length > 0) {
-      singleBackspacesRef.current += ts.length;
-      backspaceTimestampsRef.current = [];
-    }
-  }, []);
-
   const trackKeyUp = useCallback(
     (fieldName: string, event: KeyboardEvent) => {
       if (simulationEndedRef.current) return;
@@ -493,8 +468,6 @@ export function useBankingTelemetry(sessionId: string, uid?: string, userEmail?:
         flight,
         time: new Date().toISOString(),
       });
-
-      statsRef.current.totalKeystrokes += 1;
 
       // Phase 8: Digraph timing
       if (flight !== null && state.keystrokes.length >= 2) {
@@ -540,9 +513,9 @@ export function useBankingTelemetry(sessionId: string, uid?: string, userEmail?:
 
   // Copy detection via DOM copy event — fires when user selects text and copies (Ctrl+C or long-press → Copy)
   const trackCopy = useCallback(
-    (fieldName: string, event: React.ClipboardEvent<HTMLInputElement>) => {
+    (fieldName: string, _event: React.ClipboardEvent<HTMLInputElement>) => {
       if (simulationEndedRef.current) return;
-      const copiedText = event.clipboardData?.getData("text") || "";
+      const copiedText = typeof window !== "undefined" ? window.getSelection()?.toString() || "" : "";
       statsRef.current.totalCopyEvents += 1;
       pushTelemetry("copy", {
         field: fieldName,
@@ -1055,8 +1028,6 @@ export function useBankingTelemetry(sessionId: string, uid?: string, userEmail?:
   const endSimulation = useCallback(() => {
     if (simulationEndedRef.current) return;
     simulationEndedRef.current = true;
-    // Flush any pending backspace timestamps as singles before final computation
-    flushPendingBackspaces();
     const now = new Date().toISOString();
     statsRef.current.sessionEndedAt = now;
     const startMs = statsRef.current.sessionStartedAt
@@ -1081,7 +1052,7 @@ export function useBankingTelemetry(sessionId: string, uid?: string, userEmail?:
       endedAt: now,
       durationMs: statsRef.current.sessionDurationMs,
     });
-  }, [computeMetrics, pushTelemetry, flushPendingBackspaces]);
+  }, [computeMetrics, pushTelemetry]);
 
   // Build export row
   const buildExportRow = useCallback((): (string | number)[] => {

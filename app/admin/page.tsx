@@ -81,7 +81,7 @@ export default function AdminPage() {
 
       const botMetrics = generateBotMetrics(botType);
 
-      // Build export row with bot metrics — must match EXPORT_HEADERS order (60 columns)
+      // Build export row with bot metrics — must match EXPORT_HEADERS order (61 columns)
       const now = new Date().toISOString();
       const sessionDuration = botType === "highspeed" ? 8000 : botType === "smart" ? 22000 : 45000;
       const row: (string | number)[] = [

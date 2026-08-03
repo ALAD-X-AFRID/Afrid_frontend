@@ -144,7 +144,8 @@ export default function BankingSimPage() {
 
   const handleBankSearch = (query: string) => {
     setBankQuery(query);
-    telemetry.recordBankSearch(query, filteredBanks.length);
+    const count = NIGERIAN_BANKS.filter((b) => b.toLowerCase().includes(query.toLowerCase())).length;
+    telemetry.recordBankSearch(query, count);
   };
 
   const handleBankConfirm = (e: React.FormEvent) => {
