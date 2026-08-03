@@ -15,7 +15,7 @@ if inputType in ["insertReplacementText", "insertCommittedText", "insertFromDrop
   lastAutofillAtRef = now
 
 // Method 2: value-jump heuristic (Android WebView with unknown inputType)
-if inputType == "unknown" and lengthDelta > 1 and no recent keystroke and no recent paste:
+if inputType == "unknown" and lengthDelta > 2 and no recent keystroke (500ms) and no recent paste:
   totalAutofillEvents += 1
   totalAutofilledCharacters += lengthDelta
   lastAutofillAtRef = now
@@ -24,13 +24,14 @@ if inputType == "unknown" and lengthDelta > 1 and no recent keystroke and no rec
 // Every 500ms, poll registered input elements' .value directly:
 // Uses pollingPreviousValueRef (independent of trackInputChange's state.previousValue)
 if domValue.length - pollingPreviousValue.length > 1
-   and no recent keystroke
+   and no recent keystroke (500ms)
+   and no recent paste (1500ms)
    and (now - lastAutofillAtRef > 1500ms):  // skip if trackInputChange already counted it
   totalAutofillEvents += 1
   totalAutofilledCharacters += delta
   lastAutofillAtRef = now
 ```
-Autofill is detected through three complementary methods: (1) `inputType` values from the InputEvent API, which Android's autofill framework and desktop browsers fire reliably; (2) a value-jump heuristic for Android WebView where `inputType` is unavailable — if the value grows by 2+ chars with no recent keystroke or paste event, it's classified as autofill; (3) a 500ms DOM polling fallback for iOS, where Safari Autofill and iCloud Keychain set input values directly without firing any DOM events. A per-field `lastAutofillAtRef` timestamp (keyed by field name) ensures that if `trackInputChange` (Method 1 or 2) already detected an autofill for a given field, the iOS polling (Method 3) skips it within 1500ms — preventing double-counting. The 1500ms window is larger than the 500ms polling interval to guarantee the polling cycle always falls within the dedup window. The polling also uses a separate `pollingPreviousValueRef` so that `trackInputChange`'s updates to `state.previousValue` don't mask autofill jumps from the polling loop. The `lastPasteAt` timestamp ensures paste-triggered value changes are not misclassified as autofill. The paste dedup window is 1500ms (matching the autofill dedup window) to prevent slow Android WebView `change` events from slipping through after a paste.
+Autofill is detected through three complementary methods: (1) `inputType` values from the InputEvent API — only `insertReplacementText`, `insertCommittedText`, and `insertFromDrop` are treated as autofill (Android's autofill framework and desktop browsers fire these reliably); (2) a value-jump heuristic for Android WebView where `inputType` is unavailable — if the value grows by 3+ chars with no recent keystroke (500ms) or paste event, it's classified as autofill; (3) a 500ms DOM polling fallback for iOS, where Safari Autofill and iCloud Keychain set input values directly without firing any DOM events. The polling checks for recent paste (1500ms) to avoid counting pasted text as autofill. A per-field `lastAutofillAtRef` timestamp (keyed by field name) ensures that if `trackInputChange` (Method 1 or 2) already detected an autofill for a given field, the iOS polling (Method 3) skips it within 1500ms — preventing double-counting. The 1500ms window is larger than the 500ms polling interval to guarantee the polling cycle always falls within the dedup window. The polling also uses a separate `pollingPreviousValueRef` so that `trackInputChange`'s updates to `state.previousValue` don't mask autofill jumps from the polling loop. The `lastPasteAt` timestamp (1500ms window) ensures paste-triggered value changes are not misclassified as autofill in both `trackInputChange` and the polling loop. Regular typing inputTypes (`insertText`, `insertCompositionText`) are excluded from autofill detection to prevent false positives from Android keyboard autocomplete and IME composition.
 
 ## SI Unit
 - Autofill events: count (integer)

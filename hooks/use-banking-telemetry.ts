@@ -606,11 +606,10 @@ export function useBankingTelemetry(sessionId: string, uid?: string, userEmail?:
         "insertCommittedText",
         "insertFromDrop",
       ]);
-      const recentKeystroke = state.lastKeyUpAt !== null && (performance.now() - state.lastKeyUpAt < 200);
+      const recentKeystroke = state.lastKeyUpAt !== null && (performance.now() - state.lastKeyUpAt < 500);
       const isAutofill = !recentPaste && (
         autofillInputTypes.has(inputType) ||
-        (lengthDelta > 1 && (inputType === "insertCompositionText" || inputType === "insertText")) ||
-        (inputType === "unknown" && lengthDelta > 1 && !recentKeystroke)
+        (inputType === "unknown" && lengthDelta > 2 && !recentKeystroke)
       );
       if (isAutofill) {
         const lastForField = lastAutofillAtRef.current[fieldName] || 0;
@@ -1029,11 +1028,12 @@ export function useBankingTelemetry(sessionId: string, uid?: string, userEmail?:
         const domValue = element.value;
         const prevPollValue = pollingPreviousValueRef.current[fieldName] ?? "";
         const delta = domValue.length - prevPollValue.length;
-        const recentKeystroke = state.lastKeyUpAt !== null && (performance.now() - state.lastKeyUpAt < 200);
-        // Only detect if value grew by 2+ chars with no recent keystroke and trackInputChange hasn't already detected it
+        const recentKeystroke = state.lastKeyUpAt !== null && (performance.now() - state.lastKeyUpAt < 500);
+        // Only detect if value grew by 2+ chars with no recent keystroke, no recent paste, and trackInputChange hasn't already detected it
         const lastForField = lastAutofillAtRef.current[fieldName] || 0;
         const recentAutofill = performance.now() - lastForField < 1500;
-        if (delta > 1 && !recentKeystroke && !recentAutofill && domValue !== prevPollValue) {
+        const recentPaste = lastPasteAtRef.current > 0 && (performance.now() - lastPasteAtRef.current < 1500);
+        if (delta > 1 && !recentKeystroke && !recentAutofill && !recentPaste && domValue !== prevPollValue) {
           statsRef.current.totalAutofillEvents += 1;
           statsRef.current.totalAutofilledCharacters += delta;
           lastAutofillAtRef.current[fieldName] = performance.now();
