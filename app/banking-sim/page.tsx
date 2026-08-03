@@ -233,7 +233,9 @@ export default function BankingSimPage() {
         { label: "Neuromusc Entropy", value: telemetry.stats.neuromuscularEntropy ? telemetry.stats.neuromuscularEntropy.toFixed(3) : 0 },
         { label: "Dist jitter", value: telemetry.stats.distributionJitter ? telemetry.stats.distributionJitter.toFixed(3) : 0 },
         { label: "Paste events", value: telemetry.stats.totalPasteEvents || 0 },
+        { label: "Pasted chars", value: telemetry.stats.totalPastedCharacters || 0 },
         { label: "Autofill events", value: telemetry.stats.totalAutofillEvents || 0 },
+        { label: "Autofilled chars", value: telemetry.stats.totalAutofilledCharacters || 0 },
         { label: "Backspace bursts", value: telemetry.stats.backspaceBursts || 0 },
         { label: "Single backspaces", value: telemetry.stats.singleBackspaces || 0 },
         { label: "Backspace burst ratio", value: telemetry.stats.backspaceBurstRatio ? telemetry.stats.backspaceBurstRatio.toFixed(4) : 0 },
@@ -491,6 +493,8 @@ export default function BankingSimPage() {
                   autoComplete="username"
                   placeholder="johndoe@example.com"
                   value={loginForm.username}
+                  ref={(el) => telemetry.registerInputElement("login-username", el)}
+                  onPaste={(e) => telemetry.trackPaste("login-username", e)}
                   onChange={(e) => {
                     setLoginForm((f) => ({ ...f, username: e.target.value }));
                     handleFieldChange("login-username", e);
@@ -511,6 +515,8 @@ export default function BankingSimPage() {
                     autoComplete="current-password"
                     placeholder="••••••••"
                     value={loginForm.password}
+                    ref={(el) => telemetry.registerInputElement("login-password", el)}
+                    onPaste={(e) => telemetry.trackPaste("login-password", e)}
                     onChange={(e) => {
                       setLoginForm((f) => ({ ...f, password: e.target.value }));
                       handleFieldChange("login-password", e);
@@ -570,6 +576,8 @@ export default function BankingSimPage() {
                 <input
                   type="text"
                   value={transfer.name}
+                  ref={(el) => telemetry.registerInputElement("recipient-name", el)}
+                  onPaste={(e) => telemetry.trackPaste("recipient-name", e)}
                   onChange={(e) => {
                     setTransfer((t) => ({ ...t, name: e.target.value }));
                     handleFieldChange("recipient-name", e);
@@ -588,6 +596,8 @@ export default function BankingSimPage() {
                   type="text"
                   inputMode="numeric"
                   value={transfer.account}
+                  ref={(el) => telemetry.registerInputElement("recipient-account", el)}
+                  onPaste={(e) => telemetry.trackPaste("recipient-account", e)}
                   onChange={(e) => {
                     setTransfer((t) => ({ ...t, account: e.target.value }));
                     handleFieldChange("recipient-account", e);
@@ -606,6 +616,8 @@ export default function BankingSimPage() {
                   type="number"
                   min={1}
                   value={transfer.amount}
+                  ref={(el) => telemetry.registerInputElement("transfer-amount", el)}
+                  onPaste={(e) => telemetry.trackPaste("transfer-amount", e)}
                   onChange={(e) => {
                     setTransfer((t) => ({ ...t, amount: e.target.value }));
                     handleFieldChange("transfer-amount", e);
@@ -699,6 +711,8 @@ export default function BankingSimPage() {
                 <input
                   type="text"
                   value={bankQuery}
+                  ref={(el) => telemetry.registerInputElement("bank-search-input", el)}
+                  onPaste={(e) => telemetry.trackPaste("bank-search-input", e)}
                   onChange={(e) => {
                     handleBankSearch(e.target.value);
                     handleFieldChange("bank-search-input", e);

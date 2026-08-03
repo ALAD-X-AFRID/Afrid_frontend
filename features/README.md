@@ -25,8 +25,8 @@ Complete index of all tracked telemetry features for bot detection in the bankin
 | 17 | Tap-to-Vibration Correlation | Tap-to-vibration correlation | [tap-vibration-correlation.md](tap-vibration-correlation.md) | ratio (0.0–1.0) |
 | 18 | Touch Area Deformation | Touch area deformation, Touch area deformation ratio | [touch-area-deformation.md](touch-area-deformation.md) | count / ratio (0.0–1.0) |
 | 19 | Multi-Touch Anomalies | Multi-touch anomalies | [multi-touch-anomalies.md](multi-touch-anomalies.md) | count |
-| 20 | Paste Detection | Paste detected | [paste-detection.md](paste-detection.md) | count |
-| 21 | Autofill Detection | Autofill detected | [autofill-detection.md](autofill-detection.md) | count |
+| 20 | Paste Detection | Paste detected, Pasted characters | [paste-detection.md](paste-detection.md) | count / count |
+| 21 | Autofill Detection | Autofill detected, Autofilled characters | [autofill-detection.md](autofill-detection.md) | count / count |
 | 22 | GPS Location | GPS lat, GPS lng, GPS accuracy | [gps-location.md](gps-location.md) | degrees / meters |
 | 23 | Battery State | Battery level, Battery charging | [battery-state.md](battery-state.md) | ratio / boolean |
 | 24 | Screen Brightness | Screen brightness | [screen-brightness.md](screen-brightness.md) | ratio (0.0–1.0) |
@@ -41,7 +41,7 @@ Complete index of all tracked telemetry features for bot detection in the bankin
 | 33 | Backspace Behavior | Backspace bursts, Single backspaces, Backspace burst ratio | [backspace-behavior.md](backspace-behavior.md) | count / count / ratio |
 | 34 | Digraph Timing | Digraph pairs, Digraph timing variance, Digraph timing mean (ms) | [digraph-timing.md](digraph-timing.md) | count / ms² / ms |
 
-## Total Export Columns: 57
+## Total Export Columns: 59
 
 Each feature group has a dedicated markdown file with:
 - **What it is about** — plain English description
@@ -55,7 +55,7 @@ Each feature group has a dedicated markdown file with:
 
 | Feature | Web | APK (Android) | APK (iOS) |
 |---|---|---|---|
-| Keystrokes, digraph, backspace | ✅ | ✅ | ✅ |
+| Keystrokes, digraph, backspace | ✅ | ✅ (input event fallback) | ✅ |
 | Touch hold, precision | ✅ | ✅ | ✅ |
 | Touch area deformation | ✅ (Chrome) | ✅ | ❌ (no radiusX/Y) |
 | Motion sensor | ✅ (needs permission) | ✅ | ✅ (needs permission) |
@@ -64,4 +64,5 @@ Each feature group has a dedicated markdown file with:
 | Battery | ✅ (Chrome/Edge) | ✅ | ❌ (no API) |
 | Screen brightness | ✅ (AmbientLight) | ✅ | ❌ (no API) |
 | Network type | ✅ (Chrome/Edge) | ✅ | ✅ |
-| Paste, autofill | ✅ | ✅ | ✅ |
+| Paste (DOM paste event) | ✅ | ✅ | ✅ |
+| Autofill (inputType + polling) | ✅ | ✅ (inputType + value-jump) | ✅ (DOM polling) |

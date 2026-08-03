@@ -44,7 +44,9 @@ type TelemetryStats = {
   averageTouchDeformation: number;
   multiTouchAnomalies: number;
   totalPasteEvents: number;
+  totalPastedCharacters: number;
   totalAutofillEvents: number;
+  totalAutofilledCharacters: number;
   averageButtonPressure: number;
   neuromuscularEntropy: number;
   distributionJitter: number;
@@ -131,7 +133,9 @@ const defaultStats: TelemetryStats = {
   averageTouchDeformation: 0,
   multiTouchAnomalies: 0,
   totalPasteEvents: 0,
+  totalPastedCharacters: 0,
   totalAutofillEvents: 0,
+  totalAutofilledCharacters: 0,
   averageButtonPressure: 0,
   neuromuscularEntropy: 0,
   distributionJitter: 0,
@@ -207,6 +211,11 @@ export function useBankingTelemetry(sessionId: string, uid?: string, userEmail?:
   // Sensor subscription refs (for endSimulation cleanup)
   const accelSubRef = useRef<{ unsubscribe: () => void } | null>(null);
   const orientSubRef = useRef<{ unsubscribe: () => void } | null>(null);
+  // iOS autofill polling: map field name to DOM input element
+  const inputElementRef = useRef<Record<string, HTMLInputElement | null>>({});
+  const pollIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  // Paste detection: timestamp of last paste event (DOM paste event)
+  const lastPasteAtRef = useRef<number>(0);
 
   const [stats, setStats] = useState<TelemetryStats>({ ...defaultStats });
   const [eventCount, setEventCount] = useState(0);
@@ -462,10 +471,11 @@ export function useBankingTelemetry(sessionId: string, uid?: string, userEmail?:
     (fieldName: string, event: KeyboardEvent) => {
       if (simulationEndedRef.current) return;
       const state = fieldStateRef.current[fieldName];
-      if (!state || !state.lastKeyDownAt) return;
+      if (!state) return;
 
       const now = performance.now();
-      const dwell = Math.max(0, now - state.lastKeyDownAt);
+      // On mobile soft keyboards, keydown may not fire — use dwell=0 as fallback
+      const dwell = state.lastKeyDownAt ? Math.max(0, now - state.lastKeyDownAt) : 0;
       const flight = state.lastKeyUpAt ? Math.max(0, now - state.lastKeyUpAt) : null;
       state.lastKeyUpAt = now;
 
@@ -511,6 +521,25 @@ export function useBankingTelemetry(sessionId: string, uid?: string, userEmail?:
     [pushTelemetry, persistTelemetry, refreshTelemetryDisplay]
   );
 
+  // Paste detection via DOM paste event — fires reliably on long-press → "Paste" popup (mobile) and Ctrl+V (desktop)
+  const trackPaste = useCallback(
+    (fieldName: string, event: React.ClipboardEvent<HTMLInputElement>) => {
+      if (simulationEndedRef.current) return;
+      const pastedText = event.clipboardData?.getData("text") || "";
+      lastPasteAtRef.current = performance.now();
+      statsRef.current.totalPasteEvents += 1;
+      statsRef.current.totalPastedCharacters += pastedText.length;
+      pushTelemetry("paste", {
+        field: fieldName,
+        pastedLength: pastedText.length,
+        time: new Date().toISOString(),
+      });
+      persistTelemetry();
+      refreshTelemetryDisplay();
+    },
+    [pushTelemetry, persistTelemetry, refreshTelemetryDisplay]
+  );
+
   const trackInputChange = useCallback(
     (fieldName: string, event: React.ChangeEvent<HTMLInputElement>) => {
       if (simulationEndedRef.current) return;
@@ -529,7 +558,12 @@ export function useBankingTelemetry(sessionId: string, uid?: string, userEmail?:
       const lengthDelta = current.length - state.previousValue.length;
 
       // Backspace/delete detection via input event (mobile soft keyboards often skip keydown/keyup)
-      if (inputType === "deleteContentBackward" || inputType === "deleteContentForward" || inputType === "deleteByCut") {
+      // On Android WebView, inputType may be "unknown" — fall back to value-length comparison
+      const isDeleteInput = inputType === "deleteContentBackward" ||
+        inputType === "deleteContentForward" ||
+        inputType === "deleteByCut" ||
+        (inputType === "unknown" && lengthDelta < 0);
+      if (isDeleteInput) {
         const bsNow = performance.now();
         backspaceTimestampsRef.current.push(bsNow);
         classifyBackspace();
@@ -538,27 +572,25 @@ export function useBankingTelemetry(sessionId: string, uid?: string, userEmail?:
         flushPendingBackspaces();
       }
 
-      if (inputType === "insertFromPaste") {
-        statsRef.current.totalPasteEvents += 1;
-        pushTelemetry("paste", {
-          field: fieldName,
-          inputType,
-          pastedLength: current.length,
-          time: new Date().toISOString(),
-        });
-        persistTelemetry();
-      }
+      // Paste is detected via the DOM paste event (trackPaste) — not inputType.
+      // If a paste fired recently, skip autofill detection for this change.
+      const recentPaste = lastPasteAtRef.current > 0 && (performance.now() - lastPasteAtRef.current < 500);
 
-      // Autofill detection — cover multiple browser/keyboard inputType values
+      // Autofill detection — value jumped by 2+ chars with no paste event and no recent keystroke
       const autofillInputTypes = new Set([
         "insertReplacementText",
         "insertCommittedText",
         "insertFromDrop",
       ]);
-      const isAutofill = autofillInputTypes.has(inputType) ||
-        (lengthDelta > 1 && (inputType === "insertCompositionText" || inputType === "insertText"));
+      const recentKeystroke = state.lastKeyUpAt !== null && (performance.now() - state.lastKeyUpAt < 200);
+      const isAutofill = !recentPaste && (
+        autofillInputTypes.has(inputType) ||
+        (lengthDelta > 1 && (inputType === "insertCompositionText" || inputType === "insertText")) ||
+        (inputType === "unknown" && lengthDelta > 1 && !recentKeystroke)
+      );
       if (isAutofill) {
         statsRef.current.totalAutofillEvents += 1;
+        statsRef.current.totalAutofilledCharacters += lengthDelta;
         pushTelemetry("autofill", {
           field: fieldName,
           inputType,
@@ -596,6 +628,11 @@ export function useBankingTelemetry(sessionId: string, uid?: string, userEmail?:
         corrections: 0,
       };
     }
+  }, []);
+
+  // Register DOM input element for iOS autofill polling
+  const registerInputElement = useCallback((fieldName: string, element: HTMLInputElement | null) => {
+    inputElementRef.current[fieldName] = element;
   }, []);
 
   // Button pressure tracking
@@ -945,7 +982,35 @@ export function useBankingTelemetry(sessionId: string, uid?: string, userEmail?:
     const now = new Date().toISOString();
     statsRef.current.sessionStartedAt = now;
     pushTelemetry("session_start", { startedAt: now });
-  }, [pushTelemetry]);
+
+    // iOS autofill polling: Safari Autofill / iCloud Keychain set input values
+    // without firing DOM events. Poll every 500ms to detect multi-char jumps.
+    pollIntervalRef.current = setInterval(() => {
+      if (simulationEndedRef.current) return;
+      for (const [fieldName, element] of Object.entries(inputElementRef.current)) {
+        if (!element) continue;
+        const state = fieldStateRef.current[fieldName];
+        if (!state) continue;
+        const domValue = element.value;
+        const delta = domValue.length - state.previousValue.length;
+        const recentKeystroke = state.lastKeyUpAt !== null && (performance.now() - state.lastKeyUpAt < 200);
+        // Only detect if value grew by 2+ chars with no recent keystroke (not from typing)
+        if (delta > 1 && !recentKeystroke && domValue !== state.previousValue) {
+          statsRef.current.totalAutofillEvents += 1;
+          statsRef.current.totalAutofilledCharacters += delta;
+          pushTelemetry("autofill", {
+            field: fieldName,
+            inputType: "polling_detected",
+            textLength: domValue.length,
+            time: new Date().toISOString(),
+          });
+          persistTelemetry();
+        }
+        // Sync previousValue with actual DOM value to prevent re-detection
+        state.previousValue = domValue;
+      }
+    }, 500);
+  }, [pushTelemetry, persistTelemetry]);
 
   // End simulation
   const endSimulation = useCallback(() => {
@@ -966,6 +1031,11 @@ export function useBankingTelemetry(sessionId: string, uid?: string, userEmail?:
     orientSubRef.current?.unsubscribe();
     accelSubRef.current = null;
     orientSubRef.current = null;
+    // Stop autofill polling
+    if (pollIntervalRef.current) {
+      clearInterval(pollIntervalRef.current);
+      pollIntervalRef.current = null;
+    }
     // Final metrics computation
     computeMetrics();
     pushTelemetry("session_end", {
@@ -1028,7 +1098,9 @@ export function useBankingTelemetry(sessionId: string, uid?: string, userEmail?:
       Number((s.averageTouchDeformation || 0).toFixed(4)),
       s.multiTouchAnomalies || 0,
       s.totalPasteEvents || 0,
+      s.totalPastedCharacters || 0,
       s.totalAutofillEvents || 0,
+      s.totalAutofilledCharacters || 0,
       s.gpsLat ?? "",
       s.gpsLng ?? "",
       s.gpsAccuracy ?? "",
@@ -1253,8 +1325,10 @@ export function useBankingTelemetry(sessionId: string, uid?: string, userEmail?:
     firestoreEnabled: Boolean(uid),
     trackKeyDown,
     trackKeyUp,
+    trackPaste,
     trackInputChange,
     registerField,
+    registerInputElement,
     trackButtonPressure,
     trackNavTouch,
     trackScroll,
