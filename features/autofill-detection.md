@@ -25,12 +25,12 @@ if inputType == "unknown" and lengthDelta > 1 and no recent keystroke and no rec
 // Uses pollingPreviousValueRef (independent of trackInputChange's state.previousValue)
 if domValue.length - pollingPreviousValue.length > 1
    and no recent keystroke
-   and (now - lastAutofillAtRef > 500ms):  // skip if trackInputChange already counted it
+   and (now - lastAutofillAtRef > 1500ms):  // skip if trackInputChange already counted it
   totalAutofillEvents += 1
   totalAutofilledCharacters += delta
   lastAutofillAtRef = now
 ```
-Autofill is detected through three complementary methods: (1) `inputType` values from the InputEvent API, which Android's autofill framework and desktop browsers fire reliably; (2) a value-jump heuristic for Android WebView where `inputType` is unavailable — if the value grows by 2+ chars with no recent keystroke or paste event, it's classified as autofill; (3) a 500ms DOM polling fallback for iOS, where Safari Autofill and iCloud Keychain set input values directly without firing any DOM events. A shared `lastAutofillAtRef` timestamp ensures that if `trackInputChange` (Method 1 or 2) already detected an autofill, the iOS polling (Method 3) skips it within 500ms — preventing double-counting. The polling also uses a separate `pollingPreviousValueRef` so that `trackInputChange`'s updates to `state.previousValue` don't mask autofill jumps from the polling loop. The `lastPasteAt` timestamp ensures paste-triggered value changes are not misclassified as autofill.
+Autofill is detected through three complementary methods: (1) `inputType` values from the InputEvent API, which Android's autofill framework and desktop browsers fire reliably; (2) a value-jump heuristic for Android WebView where `inputType` is unavailable — if the value grows by 2+ chars with no recent keystroke or paste event, it's classified as autofill; (3) a 500ms DOM polling fallback for iOS, where Safari Autofill and iCloud Keychain set input values directly without firing any DOM events. A per-field `lastAutofillAtRef` timestamp (keyed by field name) ensures that if `trackInputChange` (Method 1 or 2) already detected an autofill for a given field, the iOS polling (Method 3) skips it within 1500ms — preventing double-counting. The 1500ms window is larger than the 500ms polling interval to guarantee the polling cycle always falls within the dedup window. The polling also uses a separate `pollingPreviousValueRef` so that `trackInputChange`'s updates to `state.previousValue` don't mask autofill jumps from the polling loop. The `lastPasteAt` timestamp ensures paste-triggered value changes are not misclassified as autofill.
 
 ## SI Unit
 - Autofill events: count (integer)

@@ -50,10 +50,26 @@ export default function AdminPage() {
       touchDeformations: botType === "highspeed" ? 0 : 2,
       multiTouchAnomalies: 0,
       totalPasteEvents: botType === "highspeed" ? 5 : 0,
+      totalPastedCharacters: botType === "highspeed" ? 15 : 0,
       totalAutofillEvents: botType === "highspeed" ? 3 : 0,
+      totalAutofilledCharacters: botType === "highspeed" ? 30 : 0,
+      totalCutEvents: botType === "baseline" ? 1 : 0,
       averageButtonPressure: botType === "highspeed" ? 0.1 : botType === "smart" ? 0.45 : 0.62,
       neuromuscularEntropy: botType === "highspeed" ? 0.01 : botType === "smart" ? 0.34 : 1.12,
       distributionJitter: botType === "highspeed" ? 5 : botType === "smart" ? 45 : 180,
+      backspaceBursts: botType === "smart" ? 1 : 0,
+      singleBackspaces: botType === "baseline" ? 5 : botType === "smart" ? 2 : 0,
+      digraphCount: botType === "highspeed" ? 20 : botType === "smart" ? 45 : 65,
+      digraphTimingVariance: botType === "highspeed" ? 5 : botType === "smart" ? 50 : 200,
+      digraphTimingMean: Number(flight.toFixed(2)),
+      averageTouchHold: botType === "highspeed" ? 30 : botType === "smart" ? 80 : 150,
+      touchHoldVariance: botType === "highspeed" ? 2 : botType === "smart" ? 15 : 60,
+      averageTouchPrecision: botType === "highspeed" ? 1 : botType === "smart" ? 5 : 15,
+      touchPrecisionVariance: botType === "highspeed" ? 0.5 : botType === "smart" ? 3 : 12,
+      averageFieldDwell: botType === "highspeed" ? 500 : botType === "smart" ? 2000 : 5000,
+      totalFieldFocusTime: botType === "highspeed" ? 2000 : botType === "smart" ? 8000 : 20000,
+      totalFieldRevisits: botType === "baseline" ? 2 : 0,
+      passwordUnmaskCount: botType === "baseline" ? 1 : 0,
     };
   }, []);
 
@@ -64,7 +80,9 @@ export default function AdminPage() {
 
       const botMetrics = generateBotMetrics(botType);
 
-      // Build export row with bot metrics
+      // Build export row with bot metrics — must match EXPORT_HEADERS order (60 columns)
+      const now = new Date().toISOString();
+      const sessionDuration = botType === "highspeed" ? 8000 : botType === "smart" ? 22000 : 45000;
       const row: (string | number)[] = [
         `${sessionId}-${botType}`,
         Math.floor(Math.random() * 200) + 50,
@@ -93,9 +111,44 @@ export default function AdminPage() {
           ? Number((botMetrics.correlatedTaps / botMetrics.totalTaps).toFixed(4))
           : 0,
         botMetrics.touchDeformations,
+        botMetrics.totalTaps > 0
+          ? Number((botMetrics.touchDeformations / botMetrics.totalTaps).toFixed(4))
+          : 0,
         botMetrics.multiTouchAnomalies,
         botMetrics.totalPasteEvents,
+        botMetrics.totalPastedCharacters,
         botMetrics.totalAutofillEvents,
+        botMetrics.totalAutofilledCharacters,
+        botMetrics.totalCutEvents,
+        "", // GPS lat
+        "", // GPS lng
+        "", // GPS accuracy
+        "", // Battery level
+        "", // Battery charging
+        "", // Screen brightness
+        "Bot Simulator", // Device model
+        botType, // OS version
+        "web", // Platform
+        "unknown", // Network type
+        now, // Session started at
+        now, // Session ended at
+        sessionDuration, // Session duration (ms)
+        Number(botMetrics.averageTouchHold.toFixed(2)),
+        Number(botMetrics.touchHoldVariance.toFixed(2)),
+        Number(botMetrics.averageTouchPrecision.toFixed(2)),
+        Number(botMetrics.touchPrecisionVariance.toFixed(2)),
+        Number(botMetrics.averageFieldDwell.toFixed(2)),
+        Number(botMetrics.totalFieldFocusTime.toFixed(2)),
+        botMetrics.totalFieldRevisits,
+        botMetrics.passwordUnmaskCount,
+        botMetrics.backspaceBursts,
+        botMetrics.singleBackspaces,
+        (botMetrics.backspaceBursts + botMetrics.singleBackspaces) > 0
+          ? Number((botMetrics.backspaceBursts / (botMetrics.backspaceBursts + botMetrics.singleBackspaces)).toFixed(4))
+          : 0,
+        botMetrics.digraphCount,
+        Number(botMetrics.digraphTimingVariance.toFixed(4)),
+        Number(botMetrics.digraphTimingMean.toFixed(2)),
         0, // is_human = 0 for bots
       ];
 
