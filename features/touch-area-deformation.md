@@ -6,8 +6,8 @@ Measures the shape of the user's finger contact patch on the touchscreen. When a
 ## How It Is Calculated
 ```
 // On touchstart:
-radiusX = touch.radiusX || 0
-radiusY = touch.radiusY || 0
+radiusX = touch.radiusX || touch.webkitRadiusX || 0
+radiusY = touch.radiusY || touch.webkitRadiusY || 0
 
 if radiusX > 0 and radiusY > 0:
   deformation = abs(radiusX - radiusY) / max(radiusX, radiusY)

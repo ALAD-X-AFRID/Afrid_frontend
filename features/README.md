@@ -58,11 +58,11 @@ The admin page at `/admin` (protected by `RoleRoute roles={["admin"]}`) provides
 
 | Bot Type | Description | Key Characteristics |
 |---|---|---|
-| Baseline | Human-like typing with corrections | 250ms delay, 8 corrections, 5 single backspaces, 1 cut event, high jitter |
+| Baseline | Human-like typing with corrections | 250ms delay, 8 corrections, 5 single backspaces, 1 cut event, 2 copy events, high jitter |
 | Smart | Optimized behavior, minimal corrections | 120ms delay, 3 corrections, 1 backspace burst, moderate jitter |
 | High-Speed | Machine-speed execution | 30ms delay, 0 corrections, 5 paste events, 3 autofill events, very low jitter |
 
-Each bot generates a full 60-column export row matching `EXPORT_HEADERS` and saves to Firestore via `saveBotTelemetry()`. Bot rows use `is_human = 0` to distinguish from human submissions (`is_human = 1`).
+Each bot generates a full 61-column export row matching `EXPORT_HEADERS` and saves to Firestore via `saveBotTelemetry()`. Bot rows use `is_human = 0` to distinguish from human submissions (`is_human = 1`).
 
 ## Platform Compatibility
 
@@ -70,7 +70,7 @@ Each bot generates a full 60-column export row matching `EXPORT_HEADERS` and sav
 |---|---|---|---|
 | Keystrokes, digraph, backspace, cut | ✅ | ✅ (input event, single-event burst) | ✅ |
 | Touch hold, precision | ✅ | ✅ | ✅ |
-| Touch area deformation | ✅ (Chrome) | ✅ | ❌ (no radiusX/Y) |
+| Touch area deformation | ✅ (Chrome) | ✅ (radiusX/Y + webkitRadiusX/Y fallback) | ❌ (no radiusX/Y) |
 | Motion sensor | ✅ (needs permission) | ✅ | ✅ (needs permission) |
 | Orientation sensor | ✅ (needs permission) | ✅ | ✅ (needs permission) |
 | GPS | ✅ (login click) | ✅ (on mount) | ✅ (on mount) |
@@ -78,4 +78,5 @@ Each bot generates a full 60-column export row matching `EXPORT_HEADERS` and sav
 | Screen brightness | ✅ (AmbientLight) | ✅ | ❌ (no API) |
 | Network type | ✅ (Chrome/Edge) | ✅ | ✅ |
 | Paste (DOM paste event) | ✅ | ✅ | ✅ |
-| Autofill (inputType + polling, dedup) | ✅ | ✅ (inputType + value-jump) | ✅ (DOM polling, dedup) |
+| Copy (DOM copy event) | ✅ | ✅ | ✅ |
+| Autofill (inputType + polling, paste-excluded, dedup) | ✅ | ✅ (inputType + value-jump) | ✅ (DOM polling, dedup) |
