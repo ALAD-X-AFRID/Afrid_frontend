@@ -220,8 +220,8 @@ export function useBankingTelemetry(sessionId: string, uid?: string, userEmail?:
   const pollingPreviousValueRef = useRef<Record<string, string>>({});
   // Paste detection: timestamp of last paste event (DOM paste event)
   const lastPasteAtRef = useRef<number>(0);
-  // Autofill dedup: shared timestamp so trackInputChange and iOS polling don't double-count
-  const lastAutofillAtRef = useRef<number>(0);
+  // Autofill dedup: per-field timestamp so duplicate change events for the same autofill don't double-count
+  const lastAutofillAtRef = useRef<Record<string, number>>({});
 
   const [stats, setStats] = useState<TelemetryStats>({ ...defaultStats });
   const [eventCount, setEventCount] = useState(0);
@@ -594,16 +594,21 @@ export function useBankingTelemetry(sessionId: string, uid?: string, userEmail?:
         (inputType === "unknown" && lengthDelta > 1 && !recentKeystroke)
       );
       if (isAutofill) {
-        statsRef.current.totalAutofillEvents += 1;
-        statsRef.current.totalAutofilledCharacters += lengthDelta;
-        lastAutofillAtRef.current = performance.now();
-        pushTelemetry("autofill", {
-          field: fieldName,
-          inputType,
-          textLength: current.length,
-          time: new Date().toISOString(),
-        });
-        persistTelemetry();
+        const lastForField = lastAutofillAtRef.current[fieldName] || 0;
+        if (performance.now() - lastForField < 500) {
+          // Duplicate change event for the same autofill — skip
+        } else {
+          statsRef.current.totalAutofillEvents += 1;
+          statsRef.current.totalAutofilledCharacters += lengthDelta;
+          lastAutofillAtRef.current[fieldName] = performance.now();
+          pushTelemetry("autofill", {
+            field: fieldName,
+            inputType,
+            textLength: current.length,
+            time: new Date().toISOString(),
+          });
+          persistTelemetry();
+        }
       }
 
       if (current.length < state.previousValue.length) {
@@ -1007,11 +1012,12 @@ export function useBankingTelemetry(sessionId: string, uid?: string, userEmail?:
         const delta = domValue.length - prevPollValue.length;
         const recentKeystroke = state.lastKeyUpAt !== null && (performance.now() - state.lastKeyUpAt < 200);
         // Only detect if value grew by 2+ chars with no recent keystroke and trackInputChange hasn't already detected it
-        const recentAutofill = lastAutofillAtRef.current > 0 && (performance.now() - lastAutofillAtRef.current < 500);
+        const lastForField = lastAutofillAtRef.current[fieldName] || 0;
+        const recentAutofill = performance.now() - lastForField < 500;
         if (delta > 1 && !recentKeystroke && !recentAutofill && domValue !== prevPollValue) {
           statsRef.current.totalAutofillEvents += 1;
           statsRef.current.totalAutofilledCharacters += delta;
-          lastAutofillAtRef.current = performance.now();
+          lastAutofillAtRef.current[fieldName] = performance.now();
           pushTelemetry("autofill", {
             field: fieldName,
             inputType: "polling_detected",
