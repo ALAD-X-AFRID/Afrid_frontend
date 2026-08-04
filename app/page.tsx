@@ -48,7 +48,7 @@ function RevealMask({ children, className = "" }: { children: React.ReactNode; c
 
 export default function Home() {
   const [email, setEmail] = useState("");
-  const [status, setStatus] = useState<"" | "success" | "error">("");
+  const [status, setStatus] = useState<"" | "success" | "error" | "api-error">("");
   const [loading, setLoading] = useState(false);
 
   const handleWaitlist = async (e: React.FormEvent) => {
@@ -56,7 +56,7 @@ export default function Home() {
     if (!email || !/\S+@\S+\.\S+/.test(email)) { setStatus("error"); return; }
     setLoading(true);
     try { await joinWaitlist(email); setStatus("success"); setEmail(""); }
-    catch { setStatus("error"); }
+    catch { setStatus("api-error"); }
     finally { setLoading(false); }
   };
 
@@ -355,6 +355,7 @@ export default function Home() {
 
               {status === "success" && <motion.p initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="mt-4 text-sm text-[#39e0ff] font-mono">[SUCCESS] You&apos;ve been added to the waitlist.</motion.p>}
               {status === "error" && <motion.p initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="mt-4 text-sm text-[#ff6b6b] font-mono">[ERROR] Please enter a valid email address.</motion.p>}
+              {status === "api-error" && <motion.p initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="mt-4 text-sm text-[#ff6b6b] font-mono">[ERROR] Server unreachable. Please try again later.</motion.p>}
             </motion.div>
           </div>
         </section>
