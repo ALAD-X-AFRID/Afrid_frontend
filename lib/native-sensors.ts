@@ -87,7 +87,7 @@ export async function getScreenBrightness(): Promise<BrightnessData> {
     }
   } catch {}
   try {
-    if ("AmbientLightSensor" in window) {
+    if (typeof window !== "undefined" && "AmbientLightSensor" in window) {
       const sensor = new (window as any).AmbientLightSensor();
       return await new Promise<BrightnessData>((resolve) => {
         const timeoutId = setTimeout(() => {
@@ -109,6 +109,12 @@ export async function getScreenBrightness(): Promise<BrightnessData> {
       });
     }
   } catch {}
+  try {
+    if (typeof window !== "undefined" && window.matchMedia) {
+      const isDark = window.matchMedia("(prefers-color-scheme: dark)").matches;
+      return { brightness: isDark ? 0.3 : 0.7 };
+    }
+  } catch {}
   return { brightness: null };
 }
 
@@ -121,9 +127,19 @@ export async function getDeviceInfo(): Promise<DeviceInfoData> {
     }
   } catch {}
   const ua = typeof navigator !== "undefined" ? navigator.userAgent : "unknown";
+  const uaData = (navigator as any).userAgentData;
   let model = "browser";
   let osVersion = "unknown";
-  if (/Android/.test(ua)) {
+  if (uaData?.platform && uaData.platform === "Android") {
+    model = "Android";
+    osVersion = uaData.platformVersion || "unknown";
+  } else if (uaData?.platform && uaData.platform === "iOS") {
+    model = "iOS";
+    osVersion = uaData.platformVersion || "unknown";
+  } else if (uaData?.platform && (uaData.platform === "Windows" || uaData.platform === "macOS")) {
+    model = uaData.platform === "Windows" ? "Windows PC" : "Mac";
+    osVersion = uaData.platformVersion || "unknown";
+  } else if (/Android/.test(ua)) {
     const modelMatch = ua.match(/;\s([^;)]+?)\s+Build\//);
     if (modelMatch) model = modelMatch[1].trim();
     else model = "Android";

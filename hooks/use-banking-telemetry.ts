@@ -582,6 +582,7 @@ export function useBankingTelemetry(sessionId: string, uid?: string, userEmail?:
       const recentKeystroke = state.lastKeyUpAt !== null && (performance.now() - state.lastKeyUpAt < 500);
       const isAutofill = !recentPaste && (
         autofillInputTypes.has(inputType) ||
+        (inputType === "insertText" && lengthDelta > 2 && !recentKeystroke) ||
         (inputType === "unknown" && lengthDelta > 2 && !recentKeystroke)
       );
       if (isAutofill) {

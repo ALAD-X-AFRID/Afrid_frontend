@@ -338,10 +338,8 @@ export default function BankingSimPage() {
     telemetry.recordPointerDown(precision);
     if (e.pointerType === "touch") return;
     const pressure = (e.nativeEvent as PointerEvent).pressure;
-    if (pressure && pressure > 0) {
+    if (pressure > 0) {
       telemetry.trackButtonPressure(pressure);
-    } else {
-      telemetry.trackButtonPressure(0.5);
     }
   }, [telemetry]);
 
@@ -352,7 +350,7 @@ export default function BankingSimPage() {
   const handleTouchStart = useCallback((e: React.TouchEvent) => {
     if (e.touches.length === 1) {
       const touch = e.touches[0];
-      const force = (touch as any).force || 0.5;
+      const force = (touch as any).force ?? (touch as any).webkitForce ?? 0;
       telemetry.trackButtonPressure(force);
       const radiusX = (touch as any).radiusX || (touch as any).webkitRadiusX || 0;
       const radiusY = (touch as any).radiusY || (touch as any).webkitRadiusY || 0;

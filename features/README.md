@@ -75,8 +75,8 @@ Each bot generates a full 61-column export row matching `EXPORT_HEADERS` and sav
 | Orientation sensor | ✅ (needs permission) | ✅ | ✅ (needs permission) |
 | GPS | ✅ (login click) | ✅ (on mount) | ✅ (on mount) |
 | Battery | ✅ (Chrome/Edge) | ✅ | ❌ (no API) |
-| Screen brightness | ✅ (AmbientLight) | ✅ | ❌ (no API) |
+| Screen brightness | ✅ (AmbientLight + prefers-color-scheme) | ✅ (native + prefers-color-scheme) | ❌ (no API) |
 | Network type | ✅ (Chrome/Edge) | ✅ | ✅ |
 | Paste (DOM paste event) | ✅ | ✅ | ✅ |
 | Copy (DOM copy event) | ✅ | ✅ | ✅ |
-| Autofill (inputType + polling, paste-excluded, dedup) | ✅ | ✅ (inputType + value-jump) | ✅ (DOM polling, dedup) |
+| Autofill (inputType + polling, paste-excluded, dedup) | ✅ | ✅ (inputType + insertText 3+ + value-jump) | ✅ (DOM polling, dedup) |

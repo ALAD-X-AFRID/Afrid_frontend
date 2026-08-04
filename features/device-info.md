@@ -15,6 +15,12 @@ platform = info.platform   // "android" | "ios"
 
 ### Web
 ```
+// Primary: UA Client Hints (modern browsers)
+if navigator.userAgentData:
+  platform = userAgentData.platform       // "Android", "iOS", "Windows", "macOS"
+  osVersion = userAgentData.platformVersion  // accurate, not frozen
+
+// Fallback: User-Agent string parsing
 const ua = navigator.userAgent
 // Android: parse "Build/" for model name, "Android X.X" for OS version
 // iOS: parse "iPhone"/"iPad", "OS X_X" for version
@@ -29,7 +35,7 @@ platform = "web"
 - Platform: string ("web", "android", "ios")
 
 ## Physical Device Used
-No sensor required. Uses `navigator.userAgent` (web) or `@capacitor/device` (native).
+No sensor required. Uses `navigator.userAgentData` (UA Client Hints, modern browsers) or `navigator.userAgent` parsing (legacy) on web, or `@capacitor/device` (native).
 
 ## Export Columns
 | Column | Type | Description |
@@ -39,4 +45,4 @@ No sensor required. Uses `navigator.userAgent` (web) or `@capacitor/device` (nat
 | Platform | string | "web", "android", or "ios" |
 
 ## Bot Detection Rationale
-Bots often spoof user agents but may use inconsistent or outdated device models. A session claiming to be from "Chrome on Android 10" but with no accelerometer data is suspicious. Cross-referencing device model with sensor availability is powerful — a real phone model should produce motion data. Note: modern Chrome freezes the UA string for privacy, so device model may be generic ("Android" instead of "SM-G973F") on newer browsers.
+Bots often spoof user agents but may use inconsistent or outdated device models. A session claiming to be from "Chrome on Android 10" but with no accelerometer data is suspicious. Cross-referencing device model with sensor availability is powerful — a real phone model should produce motion data. Note: modern Chrome freezes the UA string for privacy, so device model may be generic ("Android" instead of "SM-G973F") on browsers without UA Client Hints. When `navigator.userAgentData` is available (Chrome 90+), the OS version is accurate and not frozen.
