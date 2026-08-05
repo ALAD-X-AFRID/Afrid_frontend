@@ -240,16 +240,33 @@ html {
 
 /* === Premium input === */
 .premium-input {
-  background: rgba(255, 255, 255, 0.03);
+  background: rgba(13, 15, 23, 0.6);
   border: 1px solid rgba(255, 255, 255, 0.08);
   border-radius: 14px;
   transition: all 200ms ease;
 }
 
 .premium-input:focus {
-  background: rgba(255, 255, 255, 0.05);
+  background: rgba(13, 15, 23, 0.8);
   border-color: rgba(57, 224, 255, 0.3);
   box-shadow: 0 0 0 4px rgba(57, 224, 255, 0.08);
+}
+
+/* Force dark background on autofill across all browsers */
+input:-webkit-autofill,
+input:-webkit-autofill:hover,
+input:-webkit-autofill:focus,
+input:-webkit-autofill:active,
+textarea:-webkit-autofill,
+textarea:-webkit-autofill:hover,
+textarea:-webkit-autofill:focus,
+select:-webkit-autofill,
+select:-webkit-autofill:hover,
+select:-webkit-autofill:focus {
+  -webkit-text-fill-color: #ffffff !important;
+  -webkit-box-shadow: 0 0 0 1000px rgba(13, 15, 23, 0.95) inset !important;
+  caret-color: #ffffff !important;
+  transition: background-color 5000s ease-in-out 0s;
 }
 
 body {

@@ -71,7 +71,7 @@ export default function TuringTestPayoutsPage() {
               onChange={(e) => setAccountHolder(e.target.value)}
               placeholder="Jane Doe"
               required
-              className="mt-2 w-full rounded-xl border border-white/10 bg-white/5 px-4 py-3.5 text-sm text-white outline-none focus:border-[rgba(57, 224, 255,0.4)]"
+              className="mt-2 w-full rounded-xl border border-white/10 bg-[#0d0f17]/60 px-4 py-3.5 text-sm text-white outline-none focus:border-[rgba(57, 224, 255,0.4)]"
             />
           </label>
           <label className="text-sm text-muted">
@@ -84,7 +84,7 @@ export default function TuringTestPayoutsPage() {
               placeholder="0123456789"
               required
               maxLength={10}
-              className="mt-2 w-full rounded-xl border border-white/10 bg-white/5 px-4 py-3.5 text-sm text-white outline-none focus:border-[rgba(57, 224, 255,0.4)]"
+              className="mt-2 w-full rounded-xl border border-white/10 bg-[#0d0f17]/60 px-4 py-3.5 text-sm text-white outline-none focus:border-[rgba(57, 224, 255,0.4)]"
             />
             {accountNumberError && (
               <p className="mt-1 text-xs text-[#ff8e8e]">{accountNumberError}</p>
@@ -98,7 +98,7 @@ export default function TuringTestPayoutsPage() {
               onChange={(e) => setBankName(e.target.value)}
               placeholder="Example Bank"
               required
-              className="mt-2 w-full rounded-xl border border-white/10 bg-white/5 px-4 py-3.5 text-sm text-white outline-none focus:border-[rgba(57, 224, 255,0.4)]"
+              className="mt-2 w-full rounded-xl border border-white/10 bg-[#0d0f17]/60 px-4 py-3.5 text-sm text-white outline-none focus:border-[rgba(57, 224, 255,0.4)]"
             />
           </label>
           <button

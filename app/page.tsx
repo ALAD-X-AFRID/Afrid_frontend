@@ -345,7 +345,7 @@ export default function Home() {
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   placeholder="Your email address"
-                  className="h-12 w-full rounded-[4px] border border-white/[0.08] bg-white/[0.03] px-5 text-sm text-white outline-none transition-all placeholder:text-[#39e0ff]/40 focus:border-[#39e0ff]/40 focus:shadow-[0_0_0_3px_rgba(57, 224, 255,0.08)] font-mono"
+                  className="h-12 w-full rounded-[4px] border border-white/[0.08] bg-[#0d0f17]/60 px-5 text-sm text-white outline-none transition-all placeholder:text-[#39e0ff]/40 focus:border-[#39e0ff]/40 focus:shadow-[0_0_0_3px_rgba(57, 224, 255,0.08)] font-mono"
                   required
                 />
                 <button type="submit" disabled={loading} className="btn-primary h-12 w-full sm:w-auto px-8 disabled:opacity-60 whitespace-nowrap" data-cursor-hover>
