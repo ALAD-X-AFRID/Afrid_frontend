@@ -336,7 +336,16 @@ export default function BankingSimPage() {
       }
     }
     telemetry.recordPointerDown(precision);
-    if (e.pointerType === "touch") return;
+    if (e.pointerType === "touch") {
+      const pe = e.nativeEvent as PointerEvent;
+      const w = (pe as any).width || 0;
+      const h = (pe as any).height || 0;
+      if (w > 0 && h > 0) {
+        const deformation = Math.abs(w - h) / Math.max(w, h);
+        telemetry.recordTouchDeformation(deformation);
+      }
+      return;
+    }
     const pressure = (e.nativeEvent as PointerEvent).pressure;
     if (pressure > 0) {
       telemetry.trackButtonPressure(pressure);

@@ -70,7 +70,7 @@ Each bot generates a full 61-column export row matching `EXPORT_HEADERS` and sav
 |---|---|---|---|
 | Keystrokes, digraph, backspace, cut | ✅ | ✅ (input event, single-event burst) | ✅ |
 | Touch hold, precision | ✅ | ✅ | ✅ |
-| Touch area deformation | ✅ (Chrome) | ✅ (radiusX/Y + webkitRadiusX/Y, no threshold) | ❌ (no radiusX/Y) |
+| Touch area deformation | ✅ (Chrome) | ✅ (radiusX/Y + webkitRadiusX/Y + PointerEvent width/height) | ❌ (no radiusX/Y) |
 | Motion sensor | ✅ (needs permission) | ✅ | ✅ (needs permission) |
 | Orientation sensor | ✅ (needs permission) | ✅ | ✅ (needs permission) |
 | GPS | ✅ (login click) | ✅ (on mount) | ✅ (on mount) |

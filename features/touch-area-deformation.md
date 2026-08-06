@@ -5,15 +5,24 @@ Measures the shape of the user's finger contact patch on the touchscreen. When a
 
 ## How It Is Calculated
 ```
-// On touchstart:
+// Method 1: Touch API (touchstart event)
 radiusX = touch.radiusX || touch.webkitRadiusX || 0
 radiusY = touch.radiusY || touch.webkitRadiusY || 0
 
 if radiusX > 0 and radiusY > 0:
   deformation = abs(radiusX - radiusY) / max(radiusX, radiusY)
   touchDeformations += 1
+
+// Method 2: PointerEvent fallback (pointerdown event, touch type)
+// Used when Touch.radiusX/Y are 0 (e.g., Samsung phones)
+width = pointerEvent.width || 0
+height = pointerEvent.height || 0
+
+if width > 0 and height > 0:
+  deformation = abs(width - height) / max(width, height)
+  touchDeformations += 1
 ```
-Every touch with non-zero radius values is recorded as a deformation event. The deformation ratio captures how non-circular the touch contact patch is — no threshold is applied, so all real touch data is preserved.
+Both methods fire on touch. Method 1 uses the Touch API's `radiusX`/`radiusY`. Method 2 uses PointerEvent's `width`/`height` as a fallback for devices that report 0 for Touch radius properties (e.g., Samsung phones). No threshold is applied — all real touch data is preserved.
 
 The average deformation ratio is also computed:
 ```
@@ -26,7 +35,7 @@ Ranges from 0.0 (perfectly circular) to 1.0 (line-shaped contact).
 - Touch area deformation ratio: dimensionless ratio (0.0–1.0)
 
 ## Physical Device Used
-Capacitive touchscreen with touch area reporting. On web: `Touch.radiusX` and `Touch.radiusY`, with `webkitRadiusX`/`webkitRadiusY` fallback for Android WebView. On native (APK): Capacitor WebView reports these values on Android. iOS Safari does not report touch radius (returns 0), so deformation will be 0 on iOS — this is a platform limitation. Some Android phones also report 0 for all radius properties — this is a device-level limitation and cannot be worked around.
+Capacitive touchscreen with touch area reporting. On web: `Touch.radiusX` and `Touch.radiusY`, with `webkitRadiusX`/`webkitRadiusY` fallback for Android WebView. Fallback: `PointerEvent.width` and `PointerEvent.height` for devices that report 0 for Touch radius (e.g., Samsung phones). On native (APK): Capacitor WebView reports these values on Android. iOS Safari does not report touch radius (returns 0), so deformation will be 0 on iOS — this is a platform limitation.
 
 ## Export Columns
 | Column | Type | Description |
