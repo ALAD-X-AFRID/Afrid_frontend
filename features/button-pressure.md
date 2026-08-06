@@ -12,7 +12,7 @@ radiusY = touch.radiusY || touch.webkitRadiusY || 0
 
 // Samsung devices report force=1.0 always but contact area varies with pressure
 if force == 1.0 and radiusX > 0 and radiusY > 0:
-  pressure = min(1.0, (radiusX * radiusY) / 100)  // touch area proxy
+  pressure = radiusX * radiusY  // raw touch area in CSS pixel²
 else:
   pressure = force
 
@@ -31,7 +31,7 @@ averageButtonPressure = mean(buttonPressures)
 dimensionless (normalized 0.0–1.0)
 
 ## Physical Device Used
-Pressure-sensitive touchscreen (3D Touch / Force Touch) or stylus. On web: `Touch.force` (with `webkitForce` fallback for Android WebView) or `PointerEvent.pressure`. On devices without pressure support, `force`/`pressure` returns `0` and the reading is skipped — no synthetic value is substituted. Samsung devices report `force = 1.0` for every touch (no variable force support); for these devices, a pressure proxy is computed from the touch contact area (`radiusX * radiusY / 100`), which varies with how hard the user presses. Devices with real variable force (e.g., iPhone 3D Touch) use the raw `force` value directly.
+Pressure-sensitive touchscreen (3D Touch / Force Touch) or stylus. On web: `Touch.force` (with `webkitForce` fallback for Android WebView) or `PointerEvent.pressure`. On devices without pressure support, `force`/`pressure` returns `0` and the reading is skipped — no synthetic value is substituted. Samsung devices report `force = 1.0` for every touch (no variable force support); for these devices, the raw touch contact area (`radiusX * radiusY` in CSS pixel²) is recorded as the pressure value — harder presses produce larger contact areas. Devices with real variable force (e.g., other Android phones, iPhone 3D Touch) use the raw `force` value directly.
 
 ## Export Columns
 | Column | Type | Description |

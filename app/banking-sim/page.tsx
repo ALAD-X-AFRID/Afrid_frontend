@@ -356,7 +356,7 @@ export default function BankingSimPage() {
       // Samsung devices report force=1.0 always but contact area varies with pressure
       let pressure = force;
       if (force === 1.0 && radiusX > 0 && radiusY > 0) {
-        pressure = Math.min(1.0, (radiusX * radiusY) / 100);
+        pressure = radiusX * radiusY;
       }
       telemetry.trackButtonPressure(pressure);
       if (radiusX > 0 && radiusY > 0) {
