@@ -21,24 +21,14 @@ if "AmbientLightSensor" in window:
   })
   sensor.start()
 ```
-On web, there is no API to read the user's screen brightness setting. The Ambient Light Sensor API measures room lighting (lux) as a proxy, mapped to 0–1. If Ambient Light Sensor is unavailable (most Android browsers), the `prefers-color-scheme` CSS media query is used as a second fallback: dark mode maps to 0.3, light mode maps to 0.7. Returns `null` only if all methods fail.
-
-### Web Fallback 2 (prefers-color-scheme)
-```
-if window.matchMedia("(prefers-color-scheme: dark)").matches:
-  brightness = 0.3  // dark mode → likely dim screen
-else:
-  brightness = 0.7  // light mode → likely bright screen
-```
-When Ambient Light Sensor is unavailable (most Android browsers), the `prefers-color-scheme` media query provides a coarse brightness proxy based on the user's OS theme setting.
+On web, there is no API to read the user's screen brightness setting. The Ambient Light Sensor API measures room lighting (lux) as a proxy, mapped to 0–1. If Ambient Light Sensor is unavailable (most Android browsers), brightness returns `null` — no synthetic fallback is used. This is honest "no data" rather than a fake constant.
 
 ## SI Unit
 dimensionless ratio (0.0–1.0)
 
 ## Physical Device Used
 - Native: Screen brightness sensor (OS-level setting)
-- Web proxy 1: Ambient light sensor (MEMS light sensor) — `AmbientLightSensor` API
-- Web proxy 2: `prefers-color-scheme` CSS media query (dark/light mode → 0.3/0.7)
+- Web proxy: Ambient light sensor (MEMS light sensor) — `AmbientLightSensor` API (returns `null` on unsupported browsers, no synthetic fallback)
 
 ## Export Columns
 | Column | Type | Description |

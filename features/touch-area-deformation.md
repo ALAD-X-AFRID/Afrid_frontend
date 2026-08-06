@@ -11,10 +11,9 @@ radiusY = touch.radiusY || touch.webkitRadiusY || 0
 
 if radiusX > 0 and radiusY > 0:
   deformation = abs(radiusX - radiusY) / max(radiusX, radiusY)
-  if deformation > 0.15:
-    touchDeformations += 1
+  touchDeformations += 1
 ```
-A deformation ratio > 0.15 means the touch ellipse is significantly non-circular, as expected from a finger pressing at an angle.
+Every touch with non-zero radius values is recorded as a deformation event. The deformation ratio captures how non-circular the touch contact patch is — no threshold is applied, so all real touch data is preserved.
 
 The average deformation ratio is also computed:
 ```
@@ -32,8 +31,8 @@ Capacitive touchscreen with touch area reporting. On web: `Touch.radiusX` and `T
 ## Export Columns
 | Column | Type | Description |
 |---|---|---|
-| Touch area deformation | integer | Count of touches where deformation > 0.15 |
+| Touch area deformation | integer | Count of touches with non-zero radius (all deformation recorded) |
 | Touch area deformation ratio | float | Average deformation ratio (0.0–1.0), 4 decimal places |
 
 ## Bot Detection Rationale
-Real fingers produce elliptical touch areas because they press at angles — the contact patch deforms based on finger angle, pressure, and which finger is used. Synthetic tap events (bots) produce either no touch area (radiusX/Y = 0) or perfectly circular areas (deformation = 0). A session with many taps but zero touch area deformations is suspicious. The average deformation ratio provides a continuous metric — humans typically show 0.15–0.50, while bots show 0.0. This feature is independent of app UI (swipe/no-swipe) because it measures the physical finger-screen interaction at the instant of touch, before any gesture is recognized. Note: some browsers/devices don't report touch radius, so 0 may be inconclusive on certain platforms.
+Real fingers produce elliptical touch areas because they press at angles — the contact patch deforms based on finger angle, pressure, and which finger is used. Synthetic tap events (bots) produce either no touch area (radiusX/Y = 0) or perfectly circular areas (deformation = 0). A session with many taps but zero touch area deformations is suspicious. The average deformation ratio provides a continuous metric — humans typically show 0.05–0.50, while bots show 0.0. This feature is independent of app UI (swipe/no-swipe) because it measures the physical finger-screen interaction at the instant of touch, before any gesture is recognized. Note: some browsers/devices don't report touch radius, so 0 may be inconclusive on certain platforms.

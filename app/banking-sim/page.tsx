@@ -351,14 +351,17 @@ export default function BankingSimPage() {
     if (e.touches.length === 1) {
       const touch = e.touches[0];
       const force = (touch as any).force ?? (touch as any).webkitForce ?? 0;
-      telemetry.trackButtonPressure(force);
       const radiusX = (touch as any).radiusX || (touch as any).webkitRadiusX || 0;
       const radiusY = (touch as any).radiusY || (touch as any).webkitRadiusY || 0;
+      // Samsung devices report force=1.0 always but contact area varies with pressure
+      let pressure = force;
+      if (force === 1.0 && radiusX > 0 && radiusY > 0) {
+        pressure = Math.min(1.0, (radiusX * radiusY) / 100);
+      }
+      telemetry.trackButtonPressure(pressure);
       if (radiusX > 0 && radiusY > 0) {
         const deformation = Math.abs(radiusX - radiusY) / Math.max(radiusX, radiusY);
-        if (deformation > 0.15) {
-          telemetry.recordTouchDeformation(deformation);
-        }
+        telemetry.recordTouchDeformation(deformation);
       }
     }
   }, [telemetry]);

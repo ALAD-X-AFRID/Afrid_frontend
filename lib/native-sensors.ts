@@ -109,12 +109,6 @@ export async function getScreenBrightness(): Promise<BrightnessData> {
       });
     }
   } catch {}
-  try {
-    if (typeof window !== "undefined" && window.matchMedia) {
-      const isDark = window.matchMedia("(prefers-color-scheme: dark)").matches;
-      return { brightness: isDark ? 0.3 : 0.7 };
-    }
-  } catch {}
   return { brightness: null };
 }
 
@@ -130,27 +124,29 @@ export async function getDeviceInfo(): Promise<DeviceInfoData> {
   const uaData = (navigator as any).userAgentData;
   let model = "browser";
   let osVersion = "unknown";
-  if (uaData?.platform && uaData.platform === "Android") {
-    model = "Android";
-    osVersion = uaData.platformVersion || "unknown";
-  } else if (uaData?.platform && uaData.platform === "iOS") {
-    model = "iOS";
-    osVersion = uaData.platformVersion || "unknown";
-  } else if (uaData?.platform && (uaData.platform === "Windows" || uaData.platform === "macOS")) {
-    model = uaData.platform === "Windows" ? "Windows PC" : "Mac";
-    osVersion = uaData.platformVersion || "unknown";
-  } else if (/Android/.test(ua)) {
-    const modelMatch = ua.match(/;\s([^;)]+?)\s+Build\//);
-    if (modelMatch) model = modelMatch[1].trim();
-    else model = "Android";
-    const m = ua.match(/Android\s([\d.]+)/); osVersion = m?.[1] || "unknown";
+  // Try high-entropy UA Client Hints first (APK-like data: real model + OS version)
+  if (uaData?.getHighEntropyValues) {
+    try {
+      const hev = await uaData.getHighEntropyValues(["model", "platformVersion"]);
+      if (hev.model) model = hev.model;
+      if (hev.platformVersion) osVersion = hev.platformVersion;
+    } catch {}
   }
-  else if (/iPhone|iPad/.test(ua)) {
-    const iMatch = ua.match(/(iPhone|iPad)/); model = iMatch?.[1] || "iOS";
-    const m = ua.match(/OS\s([\d_]+)/); osVersion = m?.[1]?.replace(/_/g, ".") || "unknown";
+  // Fall back to UA string parsing if high-entropy didn't provide values
+  if (model === "browser" && osVersion === "unknown") {
+    if (/Android/.test(ua)) {
+      const modelMatch = ua.match(/;\s([^;)]+?)\s+Build\//);
+      if (modelMatch) model = modelMatch[1].trim();
+      else model = "Android";
+      const m = ua.match(/Android\s([\d.]+)/); osVersion = m?.[1] || "unknown";
+    }
+    else if (/iPhone|iPad/.test(ua)) {
+      const iMatch = ua.match(/(iPhone|iPad)/); model = iMatch?.[1] || "iOS";
+      const m = ua.match(/OS\s([\d_]+)/); osVersion = m?.[1]?.replace(/_/g, ".") || "unknown";
+    }
+    else if (/Windows/.test(ua)) { model = "Windows PC"; const m = ua.match(/Windows NT\s([\d.]+)/); osVersion = m?.[1] || "unknown"; }
+    else if (/Macintosh/.test(ua)) { model = "Mac"; const m = ua.match(/Mac OS X\s([\d_]+)/); osVersion = m?.[1]?.replace(/_/g, ".") || "unknown"; }
   }
-  else if (/Windows/.test(ua)) { model = "Windows PC"; const m = ua.match(/Windows NT\s([\d.]+)/); osVersion = m?.[1] || "unknown"; }
-  else if (/Macintosh/.test(ua)) { model = "Mac"; const m = ua.match(/Mac OS X\s([\d_]+)/); osVersion = m?.[1]?.replace(/_/g, ".") || "unknown"; }
   return { model, osVersion, platform: "web" };
 }
 
