@@ -55,8 +55,15 @@ export default function Home() {
     e.preventDefault();
     if (!email || !/\S+@\S+\.\S+/.test(email)) { setStatus("error"); return; }
     setLoading(true);
-    try { await joinWaitlist(email); setStatus("success"); setEmail(""); }
-    catch { setStatus("api-error"); }
+    try {
+      console.log("[waitlist] submitting email:", email);
+      const res = await joinWaitlist(email);
+      console.log("[waitlist] success response:", res);
+      setStatus("success"); setEmail("");
+    } catch (err) {
+      console.error("[waitlist] error:", err);
+      setStatus("api-error");
+    }
     finally { setLoading(false); }
   };
 
