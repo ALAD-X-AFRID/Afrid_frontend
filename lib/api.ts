@@ -264,20 +264,12 @@ export async function getUserStats(token: string): Promise<UserStats> {
 }
 
 export async function joinWaitlist(email: string) {
-  const url = `${API_BASE}/waitlist`;
-  console.log("[joinWaitlist] API_URL:", API_URL);
-  console.log("[joinWaitlist] full URL:", url);
-  const res = await fetch(url, {
+  const res = await fetch(`${API_BASE}/waitlist`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ email }),
   });
-  console.log("[joinWaitlist] response status:", res.status, res.statusText);
-  if (!res.ok) {
-    const body = await res.text().catch(() => "unreadable");
-    console.error("[joinWaitlist] error body:", body);
-    throw new Error(`Failed to join waitlist: ${res.status} ${body}`);
-  }
+  if (!res.ok) throw new Error("Failed to join waitlist");
   return res.json();
 }
 
