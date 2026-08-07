@@ -284,9 +284,10 @@ export default function AfricaMap({ scrollProgress, className = "", showDataPoin
                     key={`packet-${i}`}
                     cx={pt.cx}
                     cy={pt.cy}
-                    r="1"
+                    r={1}
                     fill="#ffffff"
                     filter="url(#strongGlow)"
+                    initial={{ cx: pt.cx, cy: pt.cy, r: 1, opacity: 0, scale: 0.5 }}
                     animate={{
                       cx: [pt.cx, next.cx],
                       cy: [pt.cy, next.cy],
@@ -306,10 +307,11 @@ export default function AfricaMap({ scrollProgress, className = "", showDataPoin
 
               {/* Central core — geographic center of Africa */}
               <motion.circle
-                cx={110} cy={170} r="4"
+                cx={110} cy={170} r={4}
                 fill="#39e0ff" fillOpacity="0.15"
                 stroke="#39e0ff" strokeWidth="0.5"
                 filter="url(#glow)"
+                initial={{ r: 4, fillOpacity: 0.15 }}
                 animate={{ r: [4, 7, 4], fillOpacity: [0.15, 0.25, 0.15] }}
                 transition={{ duration: 3, repeat: Infinity, ease: "easeInOut" }}
               />
