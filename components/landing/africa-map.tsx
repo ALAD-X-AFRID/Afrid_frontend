@@ -282,6 +282,8 @@ export default function AfricaMap({ scrollProgress, className = "", showDataPoin
                 return (
                   <motion.circle
                     key={`packet-${i}`}
+                    cx={pt.cx}
+                    cy={pt.cy}
                     r="1"
                     fill="#ffffff"
                     filter="url(#strongGlow)"
