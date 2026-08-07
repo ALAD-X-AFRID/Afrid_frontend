@@ -1,0 +1,12 @@
+User-agent: *
+Allow: /
+Disallow: /dashboard
+Disallow: /record
+Disallow: /submissions
+Disallow: /wallet
+Disallow: /profile
+Disallow: /validator
+Disallow: /reviewer
+Disallow: /settings
+
+Sitemap: https://afrid.io/sitemap.xml

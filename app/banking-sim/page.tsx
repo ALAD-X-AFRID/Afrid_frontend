@@ -428,9 +428,19 @@ export default function BankingSimPage() {
               Track keystrokes, corrections, and selection behavior as you authenticate, transfer funds, and choose a Nigerian bank.
             </p>
           </div>
-          <div className="rounded-2xl border border-white/10 bg-white/[0.04] px-5 py-3 text-sm">
-            <span className="block text-muted">Session</span>
-            <strong className="text-white">{sessionId || "..."}</strong>
+          <div className="flex flex-col items-end gap-3">
+            <a
+              href="/afrid.apk"
+              download
+              className="inline-flex items-center gap-2 rounded-full bg-gradient-to-r from-[#39e0ff] to-[#b27bff] px-5 py-2.5 text-sm font-bold text-[#03040d] transition-all hover:shadow-[0_0_20px_rgba(57,224,255,0.4)]"
+            >
+              <Download size={16} />
+              Download APK
+            </a>
+            <div className="rounded-2xl border border-white/10 bg-white/[0.04] px-5 py-3 text-sm">
+              <span className="block text-muted">Session</span>
+              <strong className="text-white">{sessionId || "..."}</strong>
+            </div>
           </div>
         </header>
 

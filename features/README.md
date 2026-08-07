@@ -16,7 +16,7 @@ Complete index of all tracked telemetry features for bot detection in the bankin
 | 8 | Navigation Taps | Navigation taps | [navigation-taps.md](navigation-taps.md) | count |
 | 9 | Motion Sensor | Motion checks | [motion-sensor.md](motion-sensor.md) | count |
 | 10 | Orientation Sensor | Orientation checks | [orientation-sensor.md](orientation-sensor.md) | count |
-| 11 | Button Pressure | Average button pressure | [button-pressure.md](button-pressure.md) | ratio (0.0–1.0) |
+| 11 | Button Pressure | Average button pressure | [button-pressure.md](button-pressure.md) | raw device values (no normalization) |
 | 12 | Neuromuscular Entropy | Neuromuscular Entropy | [neuromuscular-entropy.md](neuromuscular-entropy.md) | dimensionless |
 | 13 | Distribution Jitter | Distribution jitter | [distribution-jitter.md](distribution-jitter.md) | milliseconds (ms) |
 | 14 | Background Checks | Background checks | [background-checks.md](background-checks.md) | count |
@@ -80,3 +80,46 @@ Each bot generates a full 61-column export row matching `EXPORT_HEADERS` and sav
 | Paste (DOM paste event) | ✅ | ✅ | ✅ |
 | Copy (DOM copy event) | ✅ | ✅ | ✅ |
 | Autofill (inputType + polling, paste-excluded, dedup) | ✅ | ✅ (inputType + insertText 3+ + value-jump) | ✅ (DOM polling, dedup) |
+
+## Capacitor APK Build
+
+The web app is packaged as a native Android APK using [Capacitor](https://capacitorjs.com/). This enables native telemetry collection (screen brightness, device info, GPS) that mirrors the web telemetry.
+
+### Build Configuration
+- **`next.config.mjs`** — `output: "export"` for static export to `out/`
+- **`capacitor.config.ts`** — `appId: "com.afrid.app"`, `appName: "AFRID"`, `webDir: "out"`
+- **`.gitignore`** — excludes `android/` and `out/` (generated, not committed)
+
+### NPM Scripts
+| Script | Command | Description |
+|---|---|---|
+| `cap:sync` | `next build && npx cap sync android` | Build web assets and sync to Android |
+| `cap:open` | `npx cap open android` | Open Android project in Android Studio |
+| `cap:run` | `npx cap run android` | Run on connected device |
+
+### Building the APK
+```bash
+npm run cap:sync
+cd android
+./gradlew assembleDebug
+```
+The APK is generated at `android/app/build/outputs/apk/debug/app-debug.apk`.
+
+### APK Download Button
+The banking simulation page (`/banking-sim`) includes a **Download APK** button in the header. The button links to `/afrid.apk` with the `download` attribute. To enable downloads:
+1. Build the APK (see above)
+2. Copy the APK to `public/afrid.apk`
+3. Rebuild with `npm run cap:sync`
+
+### Capacitor Plugins Used
+| Plugin | Purpose |
+|---|---|
+| `@capacitor/device` | Device model, OS version (native) |
+| `@capacitor/geolocation` | GPS coordinates (native) |
+| `@capacitor/motion` | Accelerometer/gyroscope (native) |
+| `@capacitor/network` | Network type (native) |
+| `@capacitor-community/screen-brightness` | Screen brightness (native) |
+
+### Static Export Notes
+- Metadata routes (`manifest.ts`, `robots.ts`, `sitemap.ts`, `opengraph-image.tsx`) were converted to static files in `public/` (Next.js static export does not support metadata route handlers)
+- Dynamic route `app/transcribe/[id]/` was removed (incompatible with `output: "export"`)

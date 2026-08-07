@@ -1,5 +1,7 @@
 node_modules
 .next
+out
+android
 *.tsbuildinfo
 .env.local
 .env*.local
